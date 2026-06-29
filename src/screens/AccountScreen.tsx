@@ -1,9 +1,16 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useThemeStore } from '../store/useThemeStore';
+import { useColorScheme } from 'nativewind';
 
 export const AccountScreen = () => {
   const { themeMode, setThemeMode } = useThemeStore();
+  const { setColorScheme } = useColorScheme();
+
+  const handleThemeChange = (mode: 'light' | 'dark' | 'system') => {
+    setThemeMode(mode);
+    setColorScheme(mode);
+  };
 
   return (
     <View className="flex-1 items-center justify-center bg-white dark:bg-gray-900">
@@ -14,21 +21,21 @@ export const AccountScreen = () => {
       <View className="flex-row gap-4">
         <TouchableOpacity 
           className="bg-blue-500 px-4 py-2 rounded-lg"
-          onPress={() => setThemeMode('light')}
+          onPress={() => handleThemeChange('light')}
         >
           <Text className="text-white font-semibold">Light</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"
-          onPress={() => setThemeMode('dark')}
+          onPress={() => handleThemeChange('dark')}
         >
           <Text className="text-white font-semibold">Dark</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           className="bg-green-600 px-4 py-2 rounded-lg"
-          onPress={() => setThemeMode('system')}
+          onPress={() => handleThemeChange('system')}
         >
           <Text className="text-white font-semibold">System</Text>
         </TouchableOpacity>
