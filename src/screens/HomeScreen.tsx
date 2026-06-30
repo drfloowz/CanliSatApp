@@ -14,8 +14,15 @@ export const HomeScreen = ({ navigation }: any) => {
     <View className="flex-1 bg-white dark:bg-gray-900">
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View className="px-6 pt-16 pb-4">
+        <View className="px-6 pt-16 pb-4 flex-row justify-between items-center">
           <Text className="text-3xl font-bold text-black dark:text-white">Discover</Text>
+          <TouchableOpacity 
+            className="bg-red-500 px-4 py-2 rounded-full flex-row items-center gap-1"
+            onPress={() => navigation.navigate('LiveStreamRoom', { streamId: 'test-room-123', isHost: true })}
+          >
+            <Ionicons name="videocam" size={16} color="white" />
+            <Text className="text-white font-bold">Yayın Aç</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Live Now Section */}
@@ -37,7 +44,7 @@ export const HomeScreen = ({ navigation }: any) => {
                 key={stream.id}
                 activeOpacity={0.9}
                 className="mx-2 w-40"
-                onPress={() => navigation.navigate('LiveStreamRoom', { streamId: stream.id })}
+                onPress={() => navigation.navigate('LiveStreamRoom', { streamId: 'test-room-123', isHost: false })}
               >
                 {/* Fake Cover Photo */}
                 <View className={`w-full h-56 rounded-2xl ${stream.color} justify-between p-3`}>

@@ -1,27 +1,26 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, SafeAreaView, Alert, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Animated, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { createAgoraRtcEngine, RtcSurfaceView, ChannelProfileType, ClientRoleType, IRtcEngine } from 'react-native-agora';
 import { supabase } from '../services/supabase';
 import { useBidStore } from '../store/useBidStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 const ChatBubble = ({ msg, onComplete }: { msg: any, onComplete: (id: any) => void }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Mesaj geldiğinde görünür yap
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
-      // 4.5 saniye ekranda kalsın, sonra yavaşça kaybolsun
       setTimeout(() => {
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 1000,
           useNativeDriver: true,
         }).start(() => {
-          // Animasyon bitince parent bileşene haber ver ki listeden (state) silsin
           if (onComplete) onComplete(msg.id);
         });
       }, 4500);
@@ -30,9 +29,8 @@ const ChatBubble = ({ msg, onComplete }: { msg: any, onComplete: (id: any) => vo
 
   return (
     <Animated.View style={{ opacity: fadeAnim }} className="bg-black/40 self-start px-3 py-2 rounded-xl mb-2 flex-row items-center">
-      {/* Kullanıcı Profili (İsmin ilk harfi) */}
       <View className="w-6 h-6 rounded-full bg-blue-500 mr-2 items-center justify-center">
-         <Text className="text-white text-xs font-bold">{msg.user_name?.charAt(0) || 'U'}</Text>
+         <Text className="text-white text-xs font-bold">{msg.user_name?.charAt(0) || 'A'}</Text>
       </View>
       <View>
         <Text className="text-gray-300 font-bold text-xs">{msg.user_name}</Text>
@@ -48,101 +46,119 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
   const [productName, setProductName] = useState('Charizard Holo');
   const { bidsByProduct, setCurrentBid } = useBidStore();
   const currentBid = bidsByProduct[productId] || 0;
-  
   const [customBid, setCustomBid] = useState('');
   
-  // Phase 5 States
   const [messages, setMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [viewerCount, setViewerCount] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Temporary broadcaster flag for testing
-  const isBroadcaster = true;
-  const currentUser = 'TestUser';
+  const { user } = useAuthStore();
+  const currentUser = user?.name || user?.email?.split('@')[0] || 'Anonim';
+
+  // Gerçek Yayıncı Flag'i (Ana sayfadan gelen parametreye göre)
+  const isBroadcaster = route?.params?.isHost || false;
+
+  // Agora States
+  const engine = useRef<IRtcEngine | null>(null);
+  const [remoteUid, setRemoteUid] = useState<number | null>(null);
 
   useEffect(() => {
-    // 1. Fetch & Listen to Bids
+    // === AGORA INITIALIZATION ===
+    const initAgora = async () => {
+      const appId = process.env.EXPO_PUBLIC_AGORA_APP_ID || '';
+      const token = process.env.EXPO_PUBLIC_AGORA_TEMP_TOKEN || '';
+      const channelName = process.env.EXPO_PUBLIC_AGORA_CHANNEL || 'testroom';
+
+      try {
+        engine.current = createAgoraRtcEngine();
+        engine.current.initialize({ appId });
+        
+        // KRİTİK: Video modülünü hemen aktifleştir (Audience veya Broadcaster fark etmez, uzak görüntüyü çizmek için şarttır)
+        engine.current.enableVideo();
+
+        // Setup Event Listeners
+        engine.current.addListener('onUserJoined', (connection, uid) => {
+          setRemoteUid(uid);
+        });
+        engine.current.addListener('onUserOffline', (connection, uid) => {
+          setRemoteUid((prev) => (prev === uid ? null : prev));
+        });
+
+        engine.current.setChannelProfile(ChannelProfileType.ChannelProfileLiveBroadcasting);
+
+        if (isBroadcaster) {
+          engine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+          engine.current.startPreview();
+        } else {
+          engine.current.setClientRole(ClientRoleType.ClientRoleAudience);
+        }
+
+        engine.current.joinChannel(token, channelName, 0, {
+          clientRoleType: isBroadcaster ? ClientRoleType.ClientRoleBroadcaster : ClientRoleType.ClientRoleAudience
+        });
+      } catch (e) {
+        console.warn('Agora Error:', e);
+      }
+    };
+
+    initAgora();
+
+    // === SUPABASE REALTIME INITIALIZATION ===
     const bidsChannel = supabase
       .channel(`bids-channel-${productId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'bids' },
-        (payload) => {
-          if (payload.new && typeof payload.new.amount === 'number') {
-            if (!payload.new.product_id || payload.new.product_id === productId) {
-              setCurrentBid(productId, payload.new.amount);
-            }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, (payload) => {
+        if (payload.new && typeof payload.new.amount === 'number') {
+          if (!payload.new.product_id || payload.new.product_id === productId) {
+            setCurrentBid(productId, payload.new.amount);
           }
         }
-      )
+      })
       .subscribe();
 
-    // 2. Fetch & Listen to Chat Messages
     const fetchMessages = async () => {
-      const { data } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('room_id', productId)
-        .order('created_at', { ascending: true })
-        .limit(50);
+      const { data } = await supabase.from('chat_messages').select('*').eq('room_id', productId).order('created_at', { ascending: true }).limit(50);
       if (data) setMessages(data);
     };
     fetchMessages();
 
     const chatChannel = supabase
       .channel(`chat-channel-${productId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${productId}` },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
-          setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${productId}` }, (payload) => {
+        setMessages((prev) => [...prev, payload.new]);
+        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+      })
       .subscribe();
 
-    // 3. Fetch & Listen to Room Viewer Count
     const fetchRoom = async () => {
-      const { data, error } = await supabase
-        .from('rooms')
-        .select('viewer_count')
-        .eq('id', productId)
-        .single();
-      
+      const { data } = await supabase.from('rooms').select('viewer_count').eq('id', productId).single();
       if (data) {
         setViewerCount(data.viewer_count);
       } else {
-        // If room doesn't exist, create it with random viewers
         const randomViewers = Math.floor(Math.random() * 50) + 10;
         setViewerCount(randomViewers);
-        await supabase.from('rooms').insert([{ 
-          id: productId, 
-          room_name: `Room ${productId}`, 
-          viewer_count: randomViewers,
-          is_live: true 
-        }]);
+        await supabase.from('rooms').insert([{ id: productId, room_name: `Room ${productId}`, viewer_count: randomViewers, is_live: true }]);
       }
     };
     fetchRoom();
 
     const roomChannel = supabase
       .channel(`room-channel-${productId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${productId}` },
-        (payload) => {
-          if (payload.new && payload.new.viewer_count !== undefined) {
-            setViewerCount(payload.new.viewer_count);
-          }
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${productId}` }, (payload) => {
+        if (payload.new && payload.new.viewer_count !== undefined) {
+          setViewerCount(payload.new.viewer_count);
         }
-      )
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(bidsChannel);
       supabase.removeChannel(chatChannel);
       supabase.removeChannel(roomChannel);
+      
+      // Release Agora Engine
+      engine.current?.leaveChannel();
+      engine.current?.release();
     };
   }, [productId]);
 
@@ -221,7 +237,20 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
   };
 
   return (
-    <View className="flex-1 bg-gray-900 relative">
+    <View className="flex-1 relative">
+      {/* Agora Video Background */}
+      <View style={StyleSheet.absoluteFill}>
+        {isBroadcaster ? (
+          <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
+        ) : remoteUid !== null ? (
+          <RtcSurfaceView canvas={{ uid: remoteUid }} style={StyleSheet.absoluteFill} />
+        ) : (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-white text-lg">Yayıncı Bekleniyor...</Text>
+          </View>
+        )}
+      </View>
+
       {/* Top Overlay */}
       <View className="absolute top-0 w-full z-10 flex-row justify-between items-start px-4 pt-14">
         {/* Left Side: Broadcaster Info & Viewers */}

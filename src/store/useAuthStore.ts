@@ -2,12 +2,14 @@ import { create } from 'zustand';
 
 interface AuthState {
   isAuthenticated: boolean;
-  login: () => void;
+  user: { email?: string; name?: string } | null;
+  login: (userData?: { email?: string; name?: string }) => void;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false, // Default is false for testing
-  login: () => set({ isAuthenticated: true }),
-  logout: () => set({ isAuthenticated: false }),
+  user: null,
+  login: (userData) => set({ isAuthenticated: true, user: userData || { name: 'TestUser', email: 'test@example.com' } }),
+  logout: () => set({ isAuthenticated: false, user: null }),
 }));
