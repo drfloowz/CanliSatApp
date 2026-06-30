@@ -54,7 +54,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const { user } = useAuthStore();
-  const currentUser = user?.name || user?.email?.split('@')[0] || 'Anonim';
+  const currentUser = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonim';
 
   // Gerçek Yayıncı Flag'i (Ana sayfadan gelen parametreye göre)
   const isBroadcaster = route?.params?.isHost || false;

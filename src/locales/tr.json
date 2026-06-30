@@ -1,0 +1,46 @@
+{
+  "login": {
+    "title": "Hoş Geldiniz",
+    "subtitle": "Devam etmek için giriş yapın",
+    "emailLabel": "E-posta",
+    "emailPlaceholder": "E-posta adresiniz",
+    "passwordLabel": "Şifre",
+    "passwordPlaceholder": "Şifreniz",
+    "button": "Giriş Yap",
+    "noAccount": "Hesabınız yok mu? ",
+    "registerLink": "Kayıt Ol"
+  },
+  "register": {
+    "title": "Kayıt Ol",
+    "subtitle": "Aramıza katılmak için hesap oluşturun",
+    "emailLabel": "E-posta",
+    "emailPlaceholder": "E-posta adresiniz",
+    "passwordLabel": "Şifre",
+    "passwordPlaceholder": "Şifreniz",
+    "button": "Kayıt Ol",
+    "hasAccount": "Zaten hesabınız var mı? ",
+    "loginLink": "Giriş Yap",
+    "successTitle": "Başarılı",
+    "successMessage": "Hesabınız oluşturuldu, lütfen giriş yapın."
+  },
+  "home": {
+    "startLive": "Canlı Yayın Başlat",
+    "activeStreams": "Aktif Yayınlar",
+    "seeAll": "Tümünü Gör",
+    "live": "CANLI",
+    "categories": "Kategoriler",
+    "catAll": "Tümü",
+    "catClothing": "Giyim",
+    "catCollectibles": "Koleksiyon",
+    "catElectronics": "Elektronik"
+  },
+  "tabs": {
+    "home": "Ana Sayfa",
+    "discover": "Keşfet",
+    "activities": "Aktiviteler",
+    "profile": "Profil"
+  },
+  "common": {
+    "switchLanguage": "Switch to English"
+  }
+}

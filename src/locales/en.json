@@ -1,0 +1,46 @@
+{
+  "login": {
+    "title": "Welcome Back",
+    "subtitle": "Log in to continue",
+    "emailLabel": "Email",
+    "emailPlaceholder": "Your email address",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Your password",
+    "button": "Log In",
+    "noAccount": "Don't have an account? ",
+    "registerLink": "Sign Up"
+  },
+  "register": {
+    "title": "Sign Up",
+    "subtitle": "Create an account to join us",
+    "emailLabel": "Email",
+    "emailPlaceholder": "Your email address",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Your password",
+    "button": "Sign Up",
+    "hasAccount": "Already have an account? ",
+    "loginLink": "Log In",
+    "successTitle": "Success",
+    "successMessage": "Your account has been created, please log in."
+  },
+  "home": {
+    "startLive": "Start Live Stream",
+    "activeStreams": "Active Streams",
+    "seeAll": "See All",
+    "live": "LIVE",
+    "categories": "Categories",
+    "catAll": "All",
+    "catClothing": "Clothing",
+    "catCollectibles": "Collectibles",
+    "catElectronics": "Electronics"
+  },
+  "tabs": {
+    "home": "Home",
+    "discover": "Discover",
+    "activities": "Activities",
+    "profile": "Profile"
+  },
+  "common": {
+    "switchLanguage": "Türkçe'ye Geç"
+  }
+}
