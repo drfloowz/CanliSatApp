@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/useAuthStore';
 const Stack = createNativeStackNavigator();
 
 import { LiveStreamRoomScreen } from '../screens/LiveStreamRoomScreen';
+import { BroadcastRoomScreen } from '../screens/BroadcastRoomScreen';
 
 export const AppNavigator = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -19,6 +20,11 @@ export const AppNavigator = () => {
           <Stack.Screen 
             name="LiveStreamRoom" 
             component={LiveStreamRoomScreen} 
+            options={{ presentation: 'fullScreenModal' }}
+          />
+          <Stack.Screen 
+            name="BroadcastRoom" 
+            component={BroadcastRoomScreen} 
             options={{ presentation: 'fullScreenModal' }}
           />
         </Stack.Group>

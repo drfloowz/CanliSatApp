@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ImageBackground, Dimensions, Modal, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, ImageBackground, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
-import { useAuthStore } from '../../store/useAuthStore';
 
 const { width } = Dimensions.get('window');
 
@@ -24,15 +23,8 @@ const CATEGORIES = [
 
 export const HomeScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const { user } = useAuthStore();
   
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
-  
-  // Modal states
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [titleInput, setTitleInput] = useState('');
-  const [coverInput, setCoverInput] = useState('');
-  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     // 1. Fetch initial live streams
@@ -50,7 +42,7 @@ export const HomeScreen = ({ navigation }: any) => {
     fetchLiveStreams();
 
     // 2. Subscribe to realtime updates for live_streams table
-    const liveStreamsChannel = supabase.channel('live_streams_channel')
+    const channel = supabase.channel('live_streams_channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_streams' }, (payload: any) => {
         if (payload.eventType === 'UPDATE' && payload.new.status === 'ended') {
           setLiveStreams((prev) => prev.filter(stream => stream.id !== payload.new.id));
@@ -61,44 +53,9 @@ export const HomeScreen = ({ navigation }: any) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(liveStreamsChannel);
+      supabase.removeChannel(channel);
     };
   }, []);
-
-  const handleStartLive = async () => {
-    if (!titleInput.trim()) {
-      Alert.alert('Hata', 'Lütfen bir yayın başlığı girin.');
-      return;
-    }
-
-    if (!user?.id) {
-      Alert.alert('Hata', 'Oturum bilgisi bulunamadı.');
-      return;
-    }
-
-    setIsStarting(true);
-    
-    const roomId = 'live_' + Date.now().toString();
-
-    const { error } = await supabase.from('live_streams').insert([{
-      id: roomId,
-      title: titleInput,
-      cover_image: coverInput || 'https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?q=80&w=600&auto=format&fit=crop',
-      host_id: user.id,
-      status: 'live'
-    }]);
-
-    setIsStarting(false);
-
-    if (error) {
-      Alert.alert('Hata', 'Yayın başlatılamadı: ' + error.message);
-    } else {
-      setIsModalVisible(false);
-      setTitleInput('');
-      setCoverInput('');
-      navigation.navigate('LiveStreamRoom', { streamId: roomId, isHost: true });
-    }
-  };
 
   return (
     <SafeAreaView className="flex-1 bg-[#121212]" edges={['top']}>
@@ -190,31 +147,26 @@ export const HomeScreen = ({ navigation }: any) => {
                         className="w-full h-full"
                         imageStyle={{ opacity: 0.9 }}
                       >
-                        {/* Top Gradient for text readability */}
                         <LinearGradient
                           colors={['rgba(0,0,0,0.6)', 'transparent']}
                           className="absolute top-0 w-full h-20 z-0"
                         />
                         
-                        {/* Bottom Gradient for text readability */}
                         <LinearGradient
                           colors={['transparent', 'rgba(0,0,0,0.8)']}
                           className="absolute bottom-0 w-full h-24 z-0"
                         />
 
-                        {/* LIVE Badge (Top Left) */}
                         <View className="absolute top-2 left-2 bg-red-600 px-2 py-1 rounded flex-row items-center gap-1 z-10 shadow-sm shadow-black">
                           <View className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                           <Text className="text-white text-[10px] font-black uppercase tracking-widest">{t('home.live')}</Text>
                         </View>
 
-                        {/* Viewers (Top Right) */}
                         <View className="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded flex-row items-center gap-1 z-10 backdrop-blur-sm">
                           <Ionicons name="eye" size={10} color="white" />
                           <Text className="text-white text-[10px] font-bold">12</Text>
                         </View>
 
-                        {/* Broadcaster Info (Bottom Left) */}
                         <View className="absolute bottom-2 left-2 right-2 flex-row items-center gap-2 z-10">
                           <View className="w-7 h-7 rounded-full bg-zinc-700 items-center justify-center border border-white/20 overflow-hidden shadow-md shadow-black">
                             <Image source={{ uri: `https://api.dicebear.com/7.x/avataaars/png?seed=${stream.host_id}` }} className="w-full h-full" />
@@ -226,7 +178,6 @@ export const HomeScreen = ({ navigation }: any) => {
                       </ImageBackground>
                     </View>
                     
-                    {/* Title Below Image */}
                     <Text className="text-white font-semibold text-sm mt-2 px-1" numberOfLines={2}>
                       {stream.title}
                     </Text>
@@ -237,64 +188,6 @@ export const HomeScreen = ({ navigation }: any) => {
           )}
         </View>
       </ScrollView>
-
-      {/* FAB: Start Live Stream */}
-      <TouchableOpacity 
-        className="absolute bottom-6 right-5 bg-red-600 h-14 w-14 rounded-full items-center justify-center shadow-lg shadow-red-600/30 active:opacity-80"
-        onPress={() => setIsModalVisible(true)}
-      >
-        <Ionicons name="videocam" size={24} color="white" />
-      </TouchableOpacity>
-
-      {/* Modal for Starting Stream */}
-      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView behavior="padding" className="flex-1">
-          <View className="flex-1 bg-black/80 justify-end">
-            <View className="bg-[#1c1c1e] rounded-t-3xl p-6">
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-xl font-bold text-white">Canlı Yayın Başlat</Text>
-                <TouchableOpacity onPress={() => setIsModalVisible(false)} className="p-2">
-                  <Ionicons name="close" size={24} color="#a1a1aa" />
-                </TouchableOpacity>
-              </View>
-
-              <Text className="text-zinc-400 mb-2 ml-1 text-xs uppercase tracking-wider font-bold">Yayın Başlığı <Text className="text-red-500">*</Text></Text>
-              <TextInput
-                className="bg-zinc-800 text-white p-4 rounded-xl mb-4 font-semibold text-base border border-zinc-700"
-                placeholder="Örn: Koleksiyonluk Kart Satışı!"
-                placeholderTextColor="#71717a"
-                value={titleInput}
-                onChangeText={setTitleInput}
-              />
-
-              <Text className="text-zinc-400 mb-2 ml-1 text-xs uppercase tracking-wider font-bold">Kapak Görseli URL (İsteğe Bağlı)</Text>
-              <TextInput
-                className="bg-zinc-800 text-white p-4 rounded-xl mb-6 font-semibold text-base border border-zinc-700"
-                placeholder="https://..."
-                placeholderTextColor="#71717a"
-                value={coverInput}
-                onChangeText={setCoverInput}
-              />
-
-              <TouchableOpacity 
-                className="bg-red-600 p-4 rounded-xl items-center flex-row justify-center shadow-lg shadow-red-600/20"
-                onPress={handleStartLive}
-                disabled={isStarting}
-              >
-                {isStarting ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <>
-                    <Ionicons name="radio" size={20} color="white" style={{ marginRight: 8 }} />
-                    <Text className="text-white font-bold text-lg">Yayını Başlat</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
     </SafeAreaView>
   );
 };
