@@ -21,7 +21,12 @@ export const BroadcastRoomScreen = ({ route, navigation }: any) => {
               if (streamId) {
                 await streamService.endLiveStream(streamId);
               }
-              navigation.navigate('MainTabs', { screen: 'Home' });
+              // Properly pop the modal instead of pushing a nested Home screen
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.getParent()?.goBack();
+              }
             } catch (error) {
               Alert.alert('Hata', 'Yayın sonlandırılamadı.');
             }

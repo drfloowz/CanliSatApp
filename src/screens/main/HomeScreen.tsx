@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +24,7 @@ const CATEGORIES = [
 
 export const HomeScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
+  const { user } = useAuthStore();
   
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
 
@@ -36,18 +38,38 @@ export const HomeScreen = ({ navigation }: any) => {
       
       if (data) {
         setLiveStreams(data);
+        
+        // Auto-Rejoin Logic: If the current user has an active stream, immediately navigate them
+        if (user) {
+          const activeHostStream = data.find(stream => stream.host_id === user.id);
+          if (activeHostStream) {
+            navigation.navigate('BroadcastRoom', { streamId: activeHostStream.id });
+          }
+        }
       }
     };
     
     fetchLiveStreams();
 
     // 2. Subscribe to realtime updates for live_streams table
-    const channel = supabase.channel('live_streams_channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_streams' }, (payload: any) => {
-        if (payload.eventType === 'UPDATE' && payload.new.status === 'ended') {
+    const uniqueChannelName = `home_live_streams_${Date.now()}`;
+    const channel = supabase
+      .channel(uniqueChannelName)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_streams' }, (payload: any) => {
+        if (payload.new && payload.new.status === 'live') {
+          setLiveStreams((prev) => [payload.new, ...prev]);
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_streams' }, (payload: any) => {
+        if (payload.new && payload.new.status === 'ended') {
           setLiveStreams((prev) => prev.filter(stream => stream.id !== payload.new.id));
-        } else {
-          fetchLiveStreams();
+        } else if (payload.new && payload.new.status === 'live') {
+          // Edge case: update to live from another status, or stream metadata updated
+          setLiveStreams((prev) => {
+            const exists = prev.some(s => s.id === payload.new.id);
+            if (!exists) return [payload.new, ...prev];
+            return prev.map(s => s.id === payload.new.id ? payload.new : s);
+          });
         }
       })
       .subscribe();
@@ -55,7 +77,7 @@ export const HomeScreen = ({ navigation }: any) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user, navigation]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#121212]" edges={['top']}>
