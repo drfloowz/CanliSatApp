@@ -43,7 +43,7 @@ export const HomeScreen = ({ navigation }: any) => {
         if (user) {
           const activeHostStream = data.find(stream => stream.host_id === user.id);
           if (activeHostStream) {
-            navigation.navigate('BroadcastRoom', { streamId: activeHostStream.id });
+            navigation.navigate('LiveStreamRoom', { stream: activeHostStream, isHost: true });
           }
         }
       }
@@ -161,7 +161,7 @@ export const HomeScreen = ({ navigation }: any) => {
                 <View key={stream.id} className="w-[48%] mb-4">
                   <TouchableOpacity 
                     activeOpacity={0.8}
-                    onPress={() => navigation.navigate('LiveStreamRoom', { streamId: stream.id, isHost: false })}
+                    onPress={() => navigation.navigate('LiveStreamRoom', { stream: stream, isHost: false })}
                   >
                     <View className="w-full aspect-[3/4] bg-zinc-800 rounded-2xl overflow-hidden shadow-lg border border-zinc-800/50">
                       <ImageBackground 

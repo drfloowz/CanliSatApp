@@ -85,7 +85,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
         
       if (error) throw error;
       
-      navigation.navigate('BroadcastRoom', { streamId: data.id });
+      navigation.navigate('LiveStreamRoom', { stream: data, isHost: true });
     } catch (err: any) {
       Alert.alert('Hata', err.message || 'Yayın başlatılamadı.');
     } finally {
@@ -148,7 +148,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
           
           <TouchableOpacity 
             className="bg-[#FF6B00] w-full py-4 rounded-2xl items-center shadow-lg shadow-orange-500/30 mb-4"
-            onPress={() => navigation.navigate('BroadcastRoom', { streamId: activeStreamId })}
+            onPress={() => navigation.navigate('LiveStreamRoom', { stream: { id: activeStreamId, host_id: user?.id }, isHost: true })}
           >
             <Text className="text-white font-black text-lg">Yayına Dön (Resume)</Text>
           </TouchableOpacity>
