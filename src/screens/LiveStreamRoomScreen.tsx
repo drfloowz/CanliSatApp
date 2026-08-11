@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Animated, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, LayoutAnimation, UIManager, ActivityIndicator, PermissionsAndroid } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Animated, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, LayoutAnimation, UIManager, ActivityIndicator, PermissionsAndroid, Modal } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -10,47 +10,18 @@ import { supabase } from '../services/supabase';
 import { useBidStore } from '../store/useBidStore';
 import { useAuthStore } from '../store/useAuthStore';
 
-const ChatBubble = ({ msg, onComplete }: { msg: any, onComplete: (id: any) => void }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setTimeout(() => {
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }).start(() => {
-          if (onComplete) onComplete(msg.id);
-        });
-      }, 4500);
-    });
-  }, []);
-
-  if (msg.user_name === 'SYSTEM') {
-    return (
-      <Animated.View style={{ opacity: fadeAnim }} className="w-full items-center my-1">
-        <View className="bg-black/30 px-4 py-1.5 rounded-full">
-          <Text className="text-gray-300 text-xs italic font-semibold">{msg.message}</Text>
-        </View>
-      </Animated.View>
-    );
-  }
-
+export const ChatBubble = ({ msg }: { msg: any }) => {
   return (
-    <Animated.View style={{ opacity: fadeAnim }} className="bg-black/40 self-start px-3 py-2 rounded-xl mb-2 flex-row items-center">
-      <View className="w-6 h-6 rounded-full bg-blue-500 mr-2 items-center justify-center">
-         <Text className="text-white text-xs font-bold">{msg.user_name?.charAt(0) || 'A'}</Text>
-      </View>
-      <View>
-        <Text className="text-gray-300 font-bold text-xs">{msg.user_name}</Text>
-        <Text className="text-white text-sm mt-0.5">{msg.message}</Text>
-      </View>
-    </Animated.View>
+    <View className="self-start mb-2 px-3 py-1.5 bg-black/40 rounded-2xl max-w-[85%]">
+      <Text style={{ lineHeight: 20 }}>
+        <Text className="text-gray-300 font-bold text-[14px]">
+          {msg.user_name || 'Kullanıcı'}{'   '} 
+        </Text>
+        <Text className="text-white text-[14px] font-medium">
+          {msg.message}
+        </Text>
+      </Text>
+    </View>
   );
 };
 
@@ -60,6 +31,10 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
   const [productName, setProductName] = useState('Canlı Satış');
   const [currentHighestBid, setCurrentHighestBid] = useState(0);
   const [highestBidderName, setHighestBidderName] = useState('');
+  
+  const [isProductModalVisible, setIsProductModalVisible] = useState(false);
+  const [isAuctionEnded, setIsAuctionEnded] = useState(false);
+  const [productDetails, setProductDetails] = useState<any>(null);
   
   const [messages, setMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -172,11 +147,59 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
         }
       })
       .subscribe();
+    // Fallback to a hardcoded product ID for MVP testing if stream doesn't have one
+    const productId = stream?.product_id || "7b34a8bf-fe6c-4153-a4d2-7be71bc7e934";
+    
+    // FETCH INITIAL AUCTION STATE
+    const fetchInitialAuctionState = async () => {
+      // 1. Fetch Product Starting Price
+      const { data: productData } = await supabase
+        .from('products')
+        .select('name, description, price, starting_price')
+        .eq('id', productId)
+        .single();
+      
+      const startPrice = productData?.starting_price || productData?.price || 0;
+      setProductDetails(productData);
+      if (productData?.name) setProductName(productData.name);
+
+      // 2. Fetch Highest Bid
+      const { data: bidsData } = await supabase
+        .from('bids')
+        .select('amount, user_id')
+        .eq('product_id', productId)
+        .order('amount', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (bidsData) {
+        setCurrentHighestBid(bidsData.amount);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, display_name, full_name, name')
+          .eq('id', bidsData.user_id)
+          .single();
+        setHighestBidderName(profile?.username || profile?.display_name || profile?.full_name || profile?.name || 'Gizli Kullanıcı');
+      } else {
+        setCurrentHighestBid(startPrice);
+      }
+    };
+    fetchInitialAuctionState();
+
     const bidsChannel = supabase
       .channel(`bids-channel-${roomId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids', filter: `stream_id=eq.${roomId}` }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids', filter: `product_id=eq.${productId}` }, async (payload) => {
         if (payload.new && typeof payload.new.amount === 'number') {
-          setCurrentHighestBid(prev => payload.new.amount > prev ? payload.new.amount : prev);
+          setCurrentHighestBid(payload.new.amount);
+          
+          if (payload.new.user_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('username, display_name, full_name, name')
+              .eq('id', payload.new.user_id)
+              .single();
+            setHighestBidderName(profile?.username || profile?.display_name || profile?.full_name || profile?.name || 'Gizli Kullanıcı');
+          }
         }
       })
       .subscribe();
@@ -185,8 +208,12 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
     const chatChannel = supabase
       .channel(`chat-channel-${roomId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `stream_id=eq.${roomId}` }, (payload) => {
-        setMessages((prev) => [...prev, payload.new]);
-        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+        if (payload.new.message === 'SYSTEM_AUCTION_ENDED') {
+          setIsAuctionEnded(true);
+        } else {
+          setMessages((prev) => [...prev, payload.new]);
+          setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+        }
       })
       .subscribe();
 
@@ -229,9 +256,18 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
 
   const placeBid = async (amount: number) => {
     const newBid = currentHighestBid + amount;
+    // Fallback to a hardcoded product ID for MVP testing if stream doesn't have one
+    const targetProductId = stream?.product_id || "7b34a8bf-fe6c-4153-a4d2-7be71bc7e934";
+    
+    console.log("TESTING BID - Target Product ID:", targetProductId);
+    
+    if (!targetProductId) {
+      Alert.alert('Hata', 'Bu yayına bağlı geçerli bir ürün (product_id) bulunamadı!');
+      return;
+    }
     
     const { error } = await supabase.from('bids').insert([{
-      stream_id: roomId,
+      product_id: targetProductId,
       user_id: user?.id,
       amount: newBid
     }]);
@@ -239,6 +275,15 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
     if (error) {
       console.error('Error placing bid:', error.message);
     }
+  };
+
+  const handleEndAuction = async () => {
+    setIsAuctionEnded(true);
+    await supabase.from('chat_messages').insert([{
+      stream_id: roomId,
+      user_id: user?.id,
+      message: 'SYSTEM_AUCTION_ENDED'
+    }]);
   };
 
   const handleSendMessage = async () => {
@@ -250,7 +295,12 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
       user_id: user?.id,
       message: msg
     }]);
-    if (error) console.error('Error sending message:', error.message);
+    
+    if (error) {
+      console.error('Error sending message:', error.message);
+    } else {
+      Keyboard.dismiss();
+    }
   };
 
   const handleSettings = () => {
@@ -338,10 +388,18 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
                 </View>
 
                 {/* Viewer Count Badge */}
-                <View className="bg-black/40 self-start rounded-full px-3 py-1 flex-row items-center">
+                <View className="bg-black/40 self-start rounded-full px-3 py-1 flex-row items-center mb-2">
                   <Ionicons name="eye" size={14} color="#ef4444" />
                   <Text className="text-white text-xs font-bold ml-1">{viewerCount} Watching</Text>
                 </View>
+                
+                {/* Product Details Button */}
+                <TouchableOpacity 
+                  className="bg-blue-600/80 self-start rounded-full px-3 py-1.5 flex-row items-center"
+                  onPress={() => setIsProductModalVisible(true)}
+                >
+                  <Text className="text-white text-xs font-bold">ℹ️ Ürün Detayları</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Right Side: Settings & Close */}
@@ -363,13 +421,31 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
               </View>
             </View>
 
-            {/* Auction Top Overlay */}
-            <View className="absolute top-36 w-full items-center z-10" pointerEvents="none">
-              <View className="bg-black/60 px-8 py-4 rounded-3xl border border-yellow-500/50 shadow-lg shadow-yellow-500/30">
-                <Text className="text-yellow-400 font-black text-lg tracking-wider text-center uppercase">En Yüksek Teklif</Text>
-                <Text className="text-white font-black text-4xl text-center mt-1">₺{currentHighestBid}</Text>
+            {/* SOLD Overlay */}
+            {isAuctionEnded && (
+              <View className="absolute inset-0 items-center justify-center z-50" pointerEvents="none">
+                <View className="bg-black/80 p-8 rounded-3xl border-4 border-yellow-500 shadow-2xl shadow-yellow-500/50 transform -rotate-12">
+                  <Text className="text-yellow-400 font-black text-6xl text-center mb-2">SATILDI! 🎉</Text>
+                  <Text className="text-white font-bold text-2xl text-center">Kazanan:</Text>
+                  <Text className="text-green-400 font-black text-3xl text-center">{highestBidderName}</Text>
+                </View>
               </View>
-            </View>
+            )}
+
+            {/* Sleek Auction Top Overlay */}
+            {!isAuctionEnded && (
+              <View className="absolute top-24 right-4 z-10" pointerEvents="none">
+                <View className="bg-black/60 rounded-full px-4 py-2 backdrop-blur-sm border border-yellow-500/50 shadow-lg shadow-black/50 flex-row items-center w-auto max-w-[220px]">
+                  <View className="bg-yellow-500/20 w-8 h-8 rounded-full items-center justify-center mr-2 flex-shrink-0">
+                    <Ionicons name="pricetag" size={16} color="#fbbf24" />
+                  </View>
+                  <View className="flex-shrink">
+                    <Text className="text-yellow-400 font-black text-xl" numberOfLines={1}>₺{currentHighestBid}</Text>
+                    <Text className="text-white text-xs font-bold" numberOfLines={1}>{highestBidderName || 'Başlangıç Fiyatı'}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Chat Overlay */}
             <View className="w-2/3 h-1/2 justify-end pb-2 px-4">
@@ -383,9 +459,6 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
                   <ChatBubble 
                     key={msg.id || index.toString()} 
                     msg={msg} 
-                    onComplete={(id) => {
-                      setMessages(prev => prev.filter(m => m.id !== id));
-                    }}
                   />
                 ))}
               </ScrollView>
@@ -393,11 +466,12 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
 
             {/* Chat Input Bar */}
             <View className="w-full flex-row items-center px-4 mb-4">
-              <View className="flex-1 bg-black/60 rounded-full flex-row items-center px-4 py-3.5 mr-3 shadow-lg shadow-black/50 border border-white/10 backdrop-blur-md">
+              <View className="flex-1 bg-black/40 rounded-full flex-row items-center h-[44px] px-4 mr-3 border border-white/20">
                 <TextInput 
-                  className="flex-1 text-white text-base font-semibold"
+                  className="flex-1 text-white text-[15px]"
+                  style={{ height: 44, paddingVertical: 0, margin: 0, textAlignVertical: 'center' }}
                   placeholder="Sohbete katıl..."
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor="#e5e7eb"
                   value={chatInput}
                   onChangeText={setChatInput}
                   onSubmitEditing={handleSendMessage}
@@ -412,16 +486,16 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
                   }}
                 />
                 <TouchableOpacity onPress={handleSendMessage}>
-                  <Ionicons name="send" size={20} color="#60a5fa" />
+                  <Ionicons name="send" size={20} color="#3b82f6" />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity className="w-12 h-12 bg-black/60 rounded-full items-center justify-center shadow-lg shadow-black/50 border border-white/10 backdrop-blur-md">
-                <Ionicons name="share-social-outline" size={24} color="white" />
+              <TouchableOpacity className="w-[44px] h-[44px] bg-black/40 rounded-full items-center justify-center border border-white/20">
+                <Ionicons name="share-social-outline" size={22} color="white" />
               </TouchableOpacity>
             </View>
 
             {/* NEW Quick Bid Bottom Bar */}
-            {!isChatFocused && !isBroadcaster && (
+            {!isChatFocused && !isBroadcaster && !isAuctionEnded && (
               <View className="h-28 bg-transparent flex-row items-end justify-center px-4 pb-6 gap-4" pointerEvents="box-none">
                 <TouchableOpacity 
                   className="bg-zinc-800/90 px-6 py-4 rounded-full border border-zinc-600 shadow-lg"
@@ -445,12 +519,13 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
             )}
 
             {/* Host End Auction Button */}
-            {!isChatFocused && isBroadcaster && (
+            {!isChatFocused && isBroadcaster && !isAuctionEnded && (
                <View className="h-28 bg-transparent flex-row items-end justify-center px-4 pb-6" pointerEvents="box-none">
                   <TouchableOpacity 
                     className="bg-red-600/90 px-8 py-4 rounded-full border border-red-500 shadow-lg shadow-red-500/40"
+                    onPress={handleEndAuction}
                   >
-                    <Text className="text-white font-black text-lg">Açık Artırmayı Bitir</Text>
+                    <Text className="text-white font-black text-lg">🔨 Satışı Kapat</Text>
                   </TouchableOpacity>
                </View>
             )}
@@ -458,6 +533,31 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* Product Info Modal */}
+      <Modal visible={isProductModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <View className="bg-zinc-900 w-full p-6 rounded-3xl border border-zinc-700 shadow-2xl">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-white font-black text-2xl">{productDetails?.name || productName}</Text>
+              <TouchableOpacity onPress={() => setIsProductModalVisible(false)} className="bg-zinc-800 p-2 rounded-full">
+                <Ionicons name="close" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+            
+            <View className="bg-black/40 p-4 rounded-2xl mb-6">
+              <Text className="text-gray-300 text-base leading-6">
+                {productDetails?.description || "Bu ürün hakkında henüz detaylı bir açıklama girilmemiş."}
+              </Text>
+            </View>
+            
+            <View className="flex-row justify-between items-center bg-zinc-800 p-4 rounded-2xl">
+              <Text className="text-gray-400 font-bold">Piyasa Değeri:</Text>
+              <Text className="text-green-400 font-black text-xl">₺{productDetails?.price || 0}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
