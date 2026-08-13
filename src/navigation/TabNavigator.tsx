@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeScreen } from '../screens/main/HomeScreen';
 import { DiscoverScreen } from '../screens/main/DiscoverScreen';
-import { LiveSetupScreen } from '../screens/main/LiveSetupScreen';
+import { SellScreen } from '../screens/SellScreen';
 import { ActivitiesScreen } from '../screens/main/ActivitiesScreen';
 import { ProfileScreen } from '../screens/main/ProfileScreen';
 
@@ -15,7 +15,7 @@ export const TabNavigator = () => {
   const { t } = useTranslation();
 
   return (
-    <Tab.Navigator 
+    <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
@@ -54,29 +54,29 @@ export const TabNavigator = () => {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeScreen} 
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
         options={{ title: t('tabs.home') || 'Ana Sayfa' }}
       />
-      <Tab.Screen 
-        name="Discover" 
-        component={DiscoverScreen} 
+      <Tab.Screen
+        name="Discover"
+        component={DiscoverScreen}
         options={{ title: t('tabs.discover') || 'Keşfet' }}
       />
-      <Tab.Screen 
-        name="Live" 
-        component={LiveSetupScreen} 
+      <Tab.Screen
+        name="Live"
+        component={SellScreen}
         options={{ title: 'Yayın' }}
       />
-      <Tab.Screen 
-        name="Activities" 
-        component={ActivitiesScreen} 
+      <Tab.Screen
+        name="Activities"
+        component={ActivitiesScreen}
         options={{ title: t('tabs.activities') || 'Sepet' }}
       />
-      <Tab.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{ title: t('tabs.profile') || 'Hesabım' }}
       />
     </Tab.Navigator>
