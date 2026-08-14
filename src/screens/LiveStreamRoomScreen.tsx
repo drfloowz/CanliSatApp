@@ -47,9 +47,10 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
 
   // Gerçek Yayıncı Flag'i
   const stream = route.params?.stream;
-  const isBroadcaster = route.params?.isHost === true || route.params?.stream?.host_id === user?.id;
+  const mode = route.params?.mode || 'auction'; // Extracting mode from params
+  const isHost = route.params?.isHost === true || route.params?.stream?.host_id === user?.id;
 
-  console.log("Am I Broadcaster?: ", isBroadcaster, "Stream Host ID:", stream?.host_id, "My ID:", user?.id);
+  console.log("Am I Broadcaster?: ", isHost, "Stream Host ID:", stream?.host_id, "My ID:", user?.id);
 
   // Agora States
   const engine = useRef<IRtcEngine | null>(null);
@@ -63,7 +64,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
     // === AGORA INITIALIZATION ===
     const initAgora = async () => {
       // 1. İzinleri İste (Özellikle Yayıncı İçin Çok Kritik)
-      if (isBroadcaster) {
+      if (isHost) {
         if (Platform.OS === 'android') {
           await PermissionsAndroid.requestMultiple([
             PermissionsAndroid.PERMISSIONS.CAMERA,
@@ -117,20 +118,20 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
 
         engine.current.setChannelProfile(ChannelProfileType.ChannelProfileLiveBroadcasting);
 
-        if (isBroadcaster) {
+        if (isHost) {
           engine.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
           engine.current.startPreview();
         } else {
           engine.current.setClientRole(ClientRoleType.ClientRoleAudience);
         }
 
-        console.log('Agora Bağlanılıyor. Kanal:', channelName, '| Yayıncı mı:', isBroadcaster);
+        console.log('Agora Bağlanılıyor. Kanal:', channelName, '| Yayıncı mı:', isHost);
 
         // KRİTİK EKSİK: v4 SDK'da yayıncının kamerasını/sesini kanala publish etmesi (göndermesi) için açıkça belirtilmelidir.
         engine.current.joinChannel(process.env.EXPO_PUBLIC_AGORA_TOKEN || '', process.env.EXPO_PUBLIC_AGORA_CHANNEL || 'testyayini', 0, {
-          clientRoleType: isBroadcaster ? ClientRoleType.ClientRoleBroadcaster : ClientRoleType.ClientRoleAudience,
-          publishMicrophoneTrack: isBroadcaster,
-          publishCameraTrack: isBroadcaster,
+          clientRoleType: isHost ? ClientRoleType.ClientRoleBroadcaster : ClientRoleType.ClientRoleAudience,
+          publishMicrophoneTrack: isHost,
+          publishCameraTrack: isHost,
           autoSubscribeAudio: true,
           autoSubscribeVideo: true,
         });
@@ -153,7 +154,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
     const liveStreamSyncChannel = supabase
       .channel(`live-stream-sync-${roomId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_streams', filter: `id=eq.${roomId}` }, (payload) => {
-        if (!isBroadcaster && payload.new.status === 'ended') {
+        if (!isHost && payload.new.status === 'ended') {
           Alert.alert('Yayın Bitti', 'Yayıncı yayını sonlandırdı.');
           navigation.goBack();
         }
@@ -256,7 +257,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
       supabase.removeChannel(chatChannel);
       supabase.removeChannel(roomChannel);
 
-      if (isBroadcaster) {
+      if (isHost) {
         supabase.from('live_streams').update({ status: 'ended' }).eq('id', roomId).then();
       }
 
@@ -264,7 +265,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
       engine.current?.leaveChannel();
       engine.current?.release();
     };
-  }, [roomId, isBroadcaster]);
+  }, [roomId, isHost]);
 
   const placeBid = async (amount: number) => {
     const newBid = currentHighestBid + amount;
@@ -374,7 +375,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
     <View className="flex-1 bg-black">
       {/* Agora Video Background - Absolutely positioned, outside KeyboardAvoidingView so it doesn't shrink */}
       <View style={StyleSheet.absoluteFill}>
-        {isBroadcaster ? (
+        {isHost ? (
           <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
         ) : remoteUid !== null ? (
           <RtcSurfaceView canvas={{ uid: remoteUid }} style={StyleSheet.absoluteFill} />
@@ -386,17 +387,17 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
       </View>
 
       {/* Video Paused Overlay */}
-      {((!isBroadcaster && remoteVideoMuted) || (isBroadcaster && isVideoOff)) && (
-        <View 
+      {((!isHost && remoteVideoMuted) || (isHost && isVideoOff)) && (
+        <View
           style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10, 10, 10, 0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 5 }]}
           pointerEvents="none"
         >
           <View className="bg-black/40 p-6 rounded-3xl items-center border border-white/10 w-3/4">
             <Ionicons name="videocam-off" size={56} color="rgba(255,255,255,0.9)" />
             <Text className="text-white text-lg mt-4 font-semibold tracking-wide text-center">
-              {isBroadcaster ? "Görüntünüzü duraklattınız" : "Yayıncı görüntüyü duraklattı"}
+              {isHost ? "Görüntünüzü duraklattınız" : "Yayıncı görüntüyü duraklattı"}
             </Text>
-            {!isBroadcaster && (
+            {!isHost && (
               <Text className="text-white/60 text-sm mt-2 text-center">
                 Lütfen ayrılmayın, yayın kısa süre içinde devam edecek...
               </Text>
@@ -406,7 +407,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
       )}
 
       {/* Audio Muted Badge (Show only if video is still active) */}
-      {(!isBroadcaster && remoteAudioMuted && !remoteVideoMuted) && (
+      {(!isHost && remoteAudioMuted && !remoteVideoMuted) && (
         <View className="absolute top-1/2 self-center bg-red-600/90 px-4 py-2 rounded-full flex-row items-center z-10 shadow-lg shadow-black/50">
           <Ionicons name="mic-off" size={18} color="white" />
           <Text className="text-white text-sm font-bold ml-2">Yayıncı Sessizde</Text>
@@ -456,16 +457,16 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
                 </TouchableOpacity>
 
                 {/* Host Controls (Top Left - Vertical Stack) */}
-                {isBroadcaster && (
+                {isHost && (
                   <View className="flex-col items-center mt-3 ml-2 w-12">
                     <TouchableOpacity onPress={switchCamera} className="items-center justify-center w-10 h-10 bg-black/60 rounded-full border border-white/20 mb-3">
                       <Ionicons name="camera-reverse-outline" size={20} color="white" />
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity onPress={toggleMic} className="items-center justify-center w-10 h-10 bg-black/60 rounded-full border border-white/20 mb-3">
                       <Ionicons name={isMuted ? "mic-off" : "mic"} size={20} color={isMuted ? "#ef4444" : "white"} />
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity onPress={toggleVideo} className="items-center justify-center w-10 h-10 bg-black/60 rounded-full border border-white/20">
                       <Ionicons name={isVideoOff ? "videocam-off" : "videocam"} size={20} color={isVideoOff ? "#ef4444" : "white"} />
                     </TouchableOpacity>
@@ -481,7 +482,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
                 >
                   <Ionicons name="share-social-outline" size={20} color="white" />
                 </TouchableOpacity>
-                {isBroadcaster && (
+                {isHost && (
                   <TouchableOpacity
                     className="w-10 h-10 bg-black/40 rounded-full items-center justify-center"
                     onPress={handleSettings}
@@ -509,16 +510,25 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
               </View>
             )}
 
-            {/* Sleek Auction Top Overlay */}
+            {/* Sleek Pricing Top Overlay (Dynamic based on Mode) */}
             {!isAuctionEnded && (
               <View className="absolute top-24 right-4 z-10" pointerEvents="none">
                 <View className="bg-black/60 rounded-full px-4 py-2 backdrop-blur-sm border border-yellow-500/50 shadow-lg shadow-black/50 flex-row items-center w-auto max-w-[220px] mt-4">
                   <View className="bg-yellow-500/20 w-8 h-8 rounded-full items-center justify-center mr-2 flex-shrink-0">
-                    <Ionicons name="pricetag" size={16} color="#fbbf24" />
+                    <Ionicons name={mode === 'showcase' ? "cart" : "pricetag"} size={16} color="#fbbf24" />
                   </View>
                   <View className="flex-shrink">
-                    <Text className="text-yellow-400 font-black text-xl" numberOfLines={1}>₺{currentHighestBid}</Text>
-                    <Text className="text-white text-xs font-bold" numberOfLines={1}>{highestBidderName || 'Başlangıç Fiyatı'}</Text>
+                    {mode === 'auction' ? (
+                      <>
+                        <Text className="text-yellow-400 font-black text-xl" numberOfLines={1}>₺{currentHighestBid}</Text>
+                        <Text className="text-white text-xs font-bold" numberOfLines={1}>{highestBidderName || 'Başlangıç Fiyatı'}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text className="text-yellow-400 font-black text-xl" numberOfLines={1}>₺{productDetails?.price || 'Belirtilmedi'}</Text>
+                        <Text className="text-white text-xs font-bold" numberOfLines={1}>Sabit Fiyat</Text>
+                      </>
+                    )}
                   </View>
                 </View>
               </View>
@@ -568,39 +578,60 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
               </View>
             </View>
 
-            {/* NEW Quick Bid Bottom Bar */}
-            {!isChatFocused && !isBroadcaster && !isAuctionEnded && (
+            {/* Viewer Action Bottom Bar */}
+            {!isChatFocused && !isHost && !isAuctionEnded && (
               <View className="h-28 bg-transparent flex-row items-end justify-center px-4 pb-6 gap-4" pointerEvents="box-none">
-                <TouchableOpacity
-                  className="bg-zinc-800/90 px-6 py-4 rounded-full border border-zinc-600 shadow-lg"
-                  onPress={() => placeBid(10)}
-                >
-                  <Text className="text-white font-black text-lg">+10 ₺</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="bg-orange-600/90 px-6 py-4 rounded-full border border-orange-500 shadow-lg shadow-orange-500/40"
-                  onPress={() => placeBid(50)}
-                >
-                  <Text className="text-white font-black text-lg">+50 ₺</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="bg-yellow-500/90 px-6 py-4 rounded-full border border-yellow-400 shadow-lg shadow-yellow-500/40"
-                  onPress={() => placeBid(100)}
-                >
-                  <Text className="text-black font-black text-lg">+100 ₺</Text>
-                </TouchableOpacity>
+                {mode === 'auction' ? (
+                  <>
+                    <TouchableOpacity
+                      className="bg-zinc-800/90 px-6 py-4 rounded-full border border-zinc-600 shadow-lg"
+                      onPress={() => placeBid(10)}
+                    >
+                      <Text className="text-white font-black text-lg">+10 ₺</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      className="bg-orange-600/90 px-6 py-4 rounded-full border border-orange-500 shadow-lg shadow-orange-500/40"
+                      onPress={() => placeBid(50)}
+                    >
+                      <Text className="text-white font-black text-lg">+50 ₺</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      className="bg-yellow-500/90 px-6 py-4 rounded-full border border-yellow-400 shadow-lg shadow-yellow-500/40"
+                      onPress={() => placeBid(100)}
+                    >
+                      <Text className="text-black font-black text-lg">+100 ₺</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    className="flex-1 bg-blue-600/90 py-4 rounded-full border border-blue-500 shadow-lg shadow-blue-500/40 flex-row items-center justify-center"
+                    onPress={() => { Alert.alert("Başarılı", "Ürün sepete eklendi!"); }}
+                  >
+                    <Ionicons name="cart" size={24} color="white" />
+                    <Text className="text-white font-black text-xl ml-2">Hemen Satın Al</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
-            {/* Host End Auction Button */}
-            {!isChatFocused && isBroadcaster && !isAuctionEnded && (
+            {/* Host Action Bottom Bar */}
+            {!isChatFocused && isHost && !isAuctionEnded && (
               <View className="h-28 bg-transparent flex-row items-end justify-center px-4 pb-6" pointerEvents="box-none">
-                <TouchableOpacity
-                  className="bg-red-600/90 px-8 py-4 rounded-full border border-red-500 shadow-lg shadow-red-500/40"
-                  onPress={handleEndAuction}
-                >
-                  <Text className="text-white font-black text-lg">🔨 Satışı Kapat</Text>
-                </TouchableOpacity>
+                {mode === 'auction' ? (
+                  <TouchableOpacity
+                    className="bg-red-600/90 px-8 py-4 rounded-full border border-red-500 shadow-lg shadow-red-500/40"
+                    onPress={handleEndAuction}
+                  >
+                    <Text className="text-white font-black text-lg">🔨 Satışı Kapat</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    className="bg-red-600/90 px-8 py-4 rounded-full border border-red-500 shadow-lg shadow-red-500/40"
+                    onPress={() => { Alert.alert("Yayın", "Yayını bitirmek istiyor musunuz?"); }}
+                  >
+                    <Text className="text-white font-black text-lg">⏹ Yayını Bitir</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
