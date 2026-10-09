@@ -187,21 +187,36 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
         }
       })
       .subscribe();
-    // Fallback to a hardcoded product ID for MVP testing if stream doesn't have one
-    const productId = stream?.product_id || "7b34a8bf-fe6c-4153-a4d2-7be71bc7e934";
+
+    // 🚨 DÜZELTME 1: Sahte ID'yi çöpe attık. Artık sadece GERÇEK product_id kullanılacak.
+    const productId = stream?.product_id;
 
     // FETCH INITIAL AUCTION STATE
     const fetchInitialAuctionState = async () => {
-      // 1. Fetch Product Starting Price
-      const { data: productData } = await supabase
+      console.log("Fetching state for Product ID:", productId);
+      // Eğer product_id yoksa (örn: Ürün Tanıtımı modundaysa) mezat kodunu çalıştırma
+      if (!productId) return;
+
+      // 🚨 DÜZELTME 2: 'name' yerine 'title' çektik (Supabase'deki gerçek sütun adın)
+      const { data: productData, error: productError } = await supabase
         .from('products')
-        .select('name, description, price, starting_price')
+        .select('title, description, starting_price')
         .eq('id', productId)
         .single();
 
-      const startPrice = productData?.starting_price || productData?.price || 0;
+      // Veri gerçekten geldi mi?
+      console.log("Gelen Ürün Verisi:", productData);
+
+      if (productError) {
+        console.error("Ürün verisi çekilemedi:", productError);
+        return;
+      }
+
+      const startPrice = productData?.starting_price || 0;
       setProductDetails(productData);
-      if (productData?.name) setProductName(productData.name);
+
+      // name yerine title kullanıyoruz
+      if (productData?.title) setProductName(productData.title);
 
       // 2. Fetch Highest Bid
       const { data: bidsData } = await supabase
@@ -221,12 +236,18 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
           .single();
         setHighestBidderName(profile?.username || profile?.display_name || profile?.full_name || profile?.name || 'Gizli Kullanıcı');
       } else {
+        // 🚨 DÜZELTME 3: Hiç teklif yoksa fiyatı 0'dan değil, ÜRÜNÜN KENDİ FİYATINDAN başlat!
         setCurrentHighestBid(startPrice);
       }
     };
-    fetchInitialAuctionState();
 
-    const bidsChannel = supabase
+    // Sadece ürün varsa mezat durumunu çek
+    if (productId) {
+      fetchInitialAuctionState();
+    }
+
+    // Teklif Dinleyicisi (Sadece productId varsa çalışır)
+    const bidsChannel = productId ? supabase
       .channel(`bids-channel-${roomId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids', filter: `product_id=eq.${productId}` }, async (payload) => {
         if (payload.new && typeof payload.new.amount === 'number') {
@@ -242,7 +263,7 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
           }
         }
       })
-      .subscribe();
+      .subscribe() : null;
 
     // Sohbet geçmişi yüklenmiyor, liste boş başlıyor. Sadece yeni gelen mesajlar eklenecek.
     const chatChannel = supabase
@@ -283,7 +304,9 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
 
     return () => {
       supabase.removeChannel(liveStreamSyncChannel);
-      supabase.removeChannel(bidsChannel);
+      if (bidsChannel) {
+        supabase.removeChannel(bidsChannel);
+      }
       supabase.removeChannel(chatChannel);
       supabase.removeChannel(roomChannel);
 

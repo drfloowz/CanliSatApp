@@ -12,6 +12,7 @@ export const ProfileScreen = () => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
 
+
   useEffect(() => {
     const fetchProfile = async () => {
       if (!user) return;
@@ -21,7 +22,7 @@ export const ProfileScreen = () => {
           .select('*')
           .eq('id', user.id)
           .single();
-        
+
         if (!error && data) {
           setProfile(data);
         }
@@ -43,8 +44,8 @@ export const ProfileScreen = () => {
   const handleLogout = async () => {
     Alert.alert('Çıkış Yap', 'Hesabınızdan çıkmak istediğinize emin misiniz?', [
       { text: 'İptal', style: 'cancel' },
-      { 
-        text: 'Çıkış Yap', 
+      {
+        text: 'Çıkış Yap',
         style: 'destructive',
         onPress: async () => {
           await supabase.auth.signOut();
@@ -67,6 +68,12 @@ export const ProfileScreen = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#121212]" edges={['top']}>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Onboarding')}
+        className="bg-red-600 mx-4 my-4 p-4 rounded-2xl items-center"
+      >
+        <Text className="text-white font-bold text-lg">🚀 TEST: Onboarding Ekranı</Text>
+      </TouchableOpacity>
       {/* Top Header */}
       <View className="px-6 py-4 flex-row justify-between items-center">
         <Text className="text-white text-2xl font-black tracking-wide">Profilim</Text>
@@ -76,15 +83,15 @@ export const ProfileScreen = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        
+
         {/* 1. Identity Section */}
         <View className="px-6 items-center mt-2 mb-6">
           <View className="relative">
-            <Image 
+            <Image
               source={{ uri: profile?.avatar_url || 'https://ui-avatars.com/api/?name=' + displayName + '&background=FF6B00&color=fff&size=256' }}
               className="w-24 h-24 rounded-full border-4 border-[#1E1E1E]"
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               className="absolute bottom-0 right-0 bg-[#FF6B00] w-8 h-8 rounded-full items-center justify-center border-2 border-[#121212]"
               onPress={() => Alert.alert('Profil Fotoğrafı', 'Galeri açılarak fotoğraf güncelleme işlemi yapılacak.')}
             >
@@ -97,7 +104,7 @@ export const ProfileScreen = () => {
             <Ionicons name="shield-checkmark" size={12} color="#10b981" />
             <Text className="text-zinc-300 text-xs font-bold ml-1">Onaylı Alıcı</Text>
           </View>
-          
+
           <View className="flex-row mt-4 gap-8">
             <View className="items-center">
               <Text className="text-white font-black text-lg">{profile?.followers_count || 0}</Text>
@@ -170,7 +177,7 @@ export const ProfileScreen = () => {
         {/* 4. Seller Dynamic Section */}
         <View className="px-6 mb-8">
           {profile?.is_seller ? (
-            <TouchableOpacity 
+            <TouchableOpacity
               className="bg-orange-500/10 p-5 rounded-3xl border border-orange-500/30 flex-row items-center justify-between"
               onPress={() => Alert.alert('Satıcı Paneli', 'Yakında eklenecek!')}
             >
@@ -186,7 +193,7 @@ export const ProfileScreen = () => {
               <Ionicons name="chevron-forward" size={20} color="#FF6B00" />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               className="bg-[#1E1E1E] p-5 rounded-3xl border border-zinc-700 flex-row items-center justify-between"
               onPress={() => Alert.alert('Satıcı Ol', 'Başvuru formu yakında eklenecek!')}
             >
@@ -208,7 +215,7 @@ export const ProfileScreen = () => {
         <View className="px-6 mb-6">
           <Text className="text-zinc-500 font-bold mb-4 ml-2">HESAP AYARLARI</Text>
           <View className="bg-[#1E1E1E] rounded-3xl overflow-hidden border border-zinc-800">
-            
+
             <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-zinc-800/50">
               <View className="flex-row items-center">
                 <View className="w-8 h-8 bg-black/30 rounded-full items-center justify-center mr-3">
@@ -253,7 +260,7 @@ export const ProfileScreen = () => {
 
         {/* Logout Button */}
         <View className="px-6 mt-4">
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={handleLogout}
             className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex-row items-center justify-center"
           >

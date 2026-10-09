@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 export const streamService = {
-  async startLiveStream(streamData: { title: string; mode: string }) {
+  async startLiveStream(streamData: { title: string; mode: string; category?: string; product_id?: string }) {
     // 1. Get the current logged-in user
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -17,7 +17,9 @@ export const streamService = {
           title: streamData.title, 
           status: 'live',
           host_id: user.id,
-          mode: streamData.mode // CRITICAL: Now saving the mode to the DB!
+          mode: streamData.mode, // CRITICAL: Now saving the mode to the DB!
+          category: streamData.category,
+          product_id: streamData.product_id
         }
       ])
       .select()

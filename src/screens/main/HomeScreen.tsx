@@ -16,7 +16,7 @@ export const HomeScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const categories = ['Tümü', 'Takip Ettiklerim', 'Trendler', 'Giyim', 'Sneaker', 'Koleksiyon', 'Elektronik'];
-  
+
   const promotions = [
     { id: '1', title: 'Summer Sale', desc: 'Sneakerlarda %50 indirim!', color: 'bg-[#7c3aed]', badge: 'PROMOSYON' },
     { id: '2', title: 'Nadir Parçalar', desc: 'Vintage koleksiyonu yayında', color: 'bg-[#2563eb]', badge: 'ÖZEL YAYIN' },
@@ -24,7 +24,21 @@ export const HomeScreen = () => {
 
   const fetchLiveStreams = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      let userCategoriesArray: string[] = [];
+      if (user) {
+        const { data: userCategories } = await supabase
+          .from('user_categories')
+          .select('category_name')
+          .eq('user_id', user.id);
+          
+        if (userCategories && userCategories.length > 0) {
+          userCategoriesArray = userCategories.map(c => c.category_name);
+        }
+      }
+
+      let query = supabase
         .from('live_streams')
         .select(`
           *,
@@ -33,7 +47,13 @@ export const HomeScreen = () => {
         .eq('status', 'live')
         .order('created_at', { ascending: false });
 
+      if (userCategoriesArray.length > 0) {
+        query = query.in('category', userCategoriesArray);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
+      
       setLiveStreams(data || []);
     } catch (err) {
       console.error('Error fetching live streams:', err);
@@ -52,18 +72,24 @@ export const HomeScreen = () => {
     // Initial fetch
     fetchLiveStreams();
 
-    // Supabase Realtime Subscription
+    // Supabase Realtime Subscription (Benzersiz kanal ismi eklendi)
+    const channelName = `home_live_streams_${Date.now()}`;
     const channel = supabase
-      .channel('public:live_streams')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'live_streams' },
         (payload) => {
-          // Whenever a stream is created, updated, or deleted, refresh the list automatically
+          // Yayında bir değişiklik olduğunda listeyi yenile
           fetchLiveStreams();
         }
       )
       .subscribe();
+
+    // Sayfadan çıkıldığında radarı temizle (Memory leak ve çakışmayı önler)
+    return () => {
+      supabase.removeChannel(channel);
+    };
 
     // Cleanup function
     return () => {
@@ -116,7 +142,7 @@ export const HomeScreen = () => {
     <View className="mb-6">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-6">
         {categories.map((category) => (
-          <TouchableOpacity 
+          <TouchableOpacity
             key={category}
             onPress={() => setActiveCategory(category)}
             className={`mr-3 px-5 py-2.5 rounded-full border ${activeCategory === category ? 'bg-[#FF6B00] border-[#FF6B00]' : 'bg-transparent border-zinc-700'}`}
@@ -138,8 +164,8 @@ export const HomeScreen = () => {
     const modeText = item.mode === 'auction' ? 'Mezat' : 'Ürün Tanıtımı';
 
     return (
-      <TouchableOpacity 
-        className="mb-5 bg-[#1E1E1E] rounded-3xl overflow-hidden border border-zinc-800" 
+      <TouchableOpacity
+        className="mb-5 bg-[#1E1E1E] rounded-3xl overflow-hidden border border-zinc-800"
         style={{ width: CARD_WIDTH }}
         onPress={() => navigation.navigate('LiveStreamRoom', { streamId: item.id, mode: item.mode || 'auction', isHost: false })}
       >
@@ -178,9 +204,19 @@ export const HomeScreen = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B00" />}
         ListEmptyComponent={
           !loading ? (
-            <View className="items-center justify-center mt-10">
-              <Ionicons name="videocam-off-outline" size={48} color="#52525b" />
-              <Text className="text-zinc-400 mt-4 font-medium">Şu an aktif yayın bulunmuyor.</Text>
+            <View className="items-center justify-center mt-12 px-8">
+              <View className="w-24 h-24 bg-zinc-800/50 rounded-full items-center justify-center mb-6">
+                <Ionicons name="videocam-outline" size={48} color="#FF6B00" />
+              </View>
+              <Text className="text-white text-xl font-bold text-center mb-3">Yayın Bulunamadı</Text>
+              <Text className="text-zinc-400 text-center text-[15px] mb-8 leading-6">Şu an seçtiğiniz kategorilerde canlı yayın bulunmuyor.</Text>
+              <TouchableOpacity
+                className="bg-[#FF6B00] py-4 px-8 rounded-full flex-row items-center justify-center w-full"
+                onPress={() => navigation.navigate('Discover')}
+              >
+                <Text className="text-white font-bold text-base mr-2">Keşfet'e Git</Text>
+                <Ionicons name="arrow-forward" size={20} color="white" />
+              </TouchableOpacity>
             </View>
           ) : null
         }

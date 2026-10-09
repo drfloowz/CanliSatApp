@@ -11,7 +11,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
   const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
-  
+
   const [title, setTitle] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [isStarting, setIsStarting] = useState(false);
@@ -27,7 +27,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
           .select('is_seller')
           .eq('id', user.id)
           .single();
-        
+
         if (!profileError) {
           setIsSeller(!!profileData?.is_seller);
         }
@@ -51,7 +51,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
         setLoading(false);
       }
     };
-    
+
     // Check status on mount AND when screen is focused
     const unsubscribe = navigation.addListener('focus', () => {
       checkStatus();
@@ -67,9 +67,9 @@ export const LiveSetupScreen = ({ navigation }: any) => {
       Alert.alert('Hata', 'Lütfen yayın başlığını girin.');
       return;
     }
-    
+
     setIsStarting(true);
-    
+
     try {
       const { data, error } = await supabase
         .from('live_streams')
@@ -82,9 +82,9 @@ export const LiveSetupScreen = ({ navigation }: any) => {
         ])
         .select()
         .single();
-        
+
       if (error) throw error;
-      
+
       navigation.navigate('LiveStreamRoom', { stream: data, isHost: true });
     } catch (err: any) {
       Alert.alert('Hata', err.message || 'Yayın başlatılamadı.');
@@ -145,15 +145,15 @@ export const LiveSetupScreen = ({ navigation }: any) => {
           <Text className="text-zinc-400 text-center text-base mb-8 leading-6">
             Zaten aktif bir yayınınız bulunuyor. Yayına dönebilir veya sonlandırabilirsiniz.
           </Text>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             className="bg-[#FF6B00] w-full py-4 rounded-2xl items-center shadow-lg shadow-orange-500/30 mb-4"
             onPress={() => navigation.navigate('LiveStreamRoom', { stream: { id: activeStreamId, host_id: user?.id }, isHost: true })}
           >
             <Text className="text-white font-black text-lg">Yayına Dön (Resume)</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             className="bg-red-600/10 border border-red-600/30 w-full py-4 rounded-2xl items-center"
             onPress={handleEndActiveStream}
           >
@@ -166,7 +166,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#121212]" edges={['top']}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1 px-6 justify-center"
       >
@@ -181,7 +181,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
         <View className="gap-5">
           <View>
             <Text className="text-zinc-300 font-bold mb-2 ml-1">Yayın Başlığı *</Text>
-            <TextInput 
+            <TextInput
               className="w-full bg-[#1E1E1E] text-white px-5 py-4 rounded-2xl border border-transparent focus:border-[#FF6B00] transition-colors font-medium"
               placeholder="Örn: Büyük Yaz İndirimi!"
               placeholderTextColor="#71717a"
@@ -192,7 +192,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
 
           <View>
             <Text className="text-zinc-300 font-bold mb-2 ml-1">Kapak Görseli URL (Opsiyonel)</Text>
-            <TextInput 
+            <TextInput
               className="w-full bg-[#1E1E1E] text-white px-5 py-4 rounded-2xl border border-transparent focus:border-[#FF6B00] transition-colors font-medium"
               placeholder="https://example.com/image.jpg"
               placeholderTextColor="#71717a"
@@ -203,7 +203,7 @@ export const LiveSetupScreen = ({ navigation }: any) => {
             />
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={handleStartStream}
             disabled={isStarting}
             className={`w-full ${isStarting ? 'opacity-70' : 'opacity-100'} bg-[#FF6B00] mt-4 py-4 rounded-2xl items-center shadow-lg shadow-orange-500/30 flex-row justify-center`}

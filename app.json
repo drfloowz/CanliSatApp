@@ -34,7 +34,8 @@
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "deploymentTarget": "16.4"
           }
         }
       ],
@@ -44,7 +45,8 @@
           "cameraPermission": "Allow CanliSatApp to access your camera for live streaming."
         }
       ],
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-font"
     ]
   }
 }

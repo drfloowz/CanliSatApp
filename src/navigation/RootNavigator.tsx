@@ -15,9 +15,9 @@ export const RootNavigator = () => {
       {isAuthenticated ? (
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
-          <Stack.Screen 
-            name="LiveStreamRoom" 
-            component={LiveStreamRoomScreen} 
+          <Stack.Screen
+            name="LiveStreamRoom"
+            component={LiveStreamRoomScreen}
             options={{ presentation: 'fullScreenModal' }}
           />
         </>

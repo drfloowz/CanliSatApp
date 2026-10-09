@@ -8,6 +8,8 @@ const Stack = createNativeStackNavigator();
 
 import { LiveStreamRoomScreen } from '../screens/LiveStreamRoomScreen';
 import { BroadcastRoomScreen } from '../screens/BroadcastRoomScreen';
+import { SellerProfileScreen } from '../screens/main/SellerProfileScreen';
+import { OnboardingScreen } from '../screens/main/OnboardingScreen';
 
 export const AppNavigator = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -18,6 +20,11 @@ export const AppNavigator = () => {
         <Stack.Group>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen 
+            name="Onboarding" 
+            component={OnboardingScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
             name="LiveStreamRoom" 
             component={LiveStreamRoomScreen} 
             options={{ presentation: 'fullScreenModal' }}
@@ -26,6 +33,11 @@ export const AppNavigator = () => {
             name="BroadcastRoom" 
             component={BroadcastRoomScreen} 
             options={{ presentation: 'fullScreenModal' }}
+          />
+          <Stack.Screen 
+            name="SellerProfile" 
+            component={SellerProfileScreen} 
+            options={{ headerShown: false }}
           />
         </Stack.Group>
       ) : (
