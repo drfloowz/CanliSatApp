@@ -25,6 +25,32 @@ export const ChatBubble = ({ msg }: { msg: any }) => {
   );
 };
 
+const AnimatedMessageItem = ({ msg, onFadeOut }: { msg: any; onFadeOut: (id: string) => void }) => {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        if (msg.id) {
+          onFadeOut(msg.id);
+        }
+      });
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity }}>
+      <ChatBubble msg={msg} />
+    </Animated.View>
+  );
+};
+
 export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
   const roomId = route?.params?.stream?.id || route?.params?.streamId || 'test-room-123';
 
@@ -47,7 +73,8 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
 
   // Gerçek Yayıncı Flag'i
   const stream = route.params?.stream;
-  const mode = route.params?.mode || 'auction'; // Extracting mode from params
+  // Fallback to stream object if params doesn't directly have it (for audience entering from home feed)
+  const mode = route.params?.mode || route.params?.stream?.mode || 'auction';
   const isHost = route.params?.isHost === true || route.params?.stream?.host_id === user?.id;
 
   console.log("Am I Broadcaster?: ", isHost, "Stream Host ID:", stream?.host_id, "My ID:", user?.id);
@@ -224,7 +251,10 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
         if (payload.new.message === 'SYSTEM_AUCTION_ENDED') {
           setIsAuctionEnded(true);
         } else {
+          // 1. Yeni mesajı listeye ekle
           setMessages((prev) => [...prev, payload.new]);
+
+          // 2. Ekranı yumuşakça en alta kaydır
           setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
         }
       })
@@ -358,13 +388,21 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
   };
 
   const toggleMic = () => {
-    engine.current?.muteLocalAudioStream(!isMuted);
-    setIsMuted(!isMuted);
+    const willBeMuted = !isMuted;
+    // 1. Tell the network to stop sending audio packets (Triggers audience overlays)
+    engine.current?.muteLocalAudioStream(willBeMuted);
+    // 2. Physically disable/enable the microphone hardware to save CPU/Battery
+    engine.current?.enableLocalAudio(!willBeMuted);
+    setIsMuted(willBeMuted);
   };
 
   const toggleVideo = () => {
-    engine.current?.muteLocalVideoStream(!isVideoOff);
-    setIsVideoOff(!isVideoOff);
+    const willBeOff = !isVideoOff;
+    // 1. Tell the network to stop sending video packets (Triggers audience overlays)
+    engine.current?.muteLocalVideoStream(willBeOff);
+    // 2. Physically disable/enable the camera hardware to prevent overheating and save battery
+    engine.current?.enableLocalVideo(!willBeOff);
+    setIsVideoOff(willBeOff);
   };
 
   const switchCamera = () => {
@@ -543,9 +581,12 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
                 onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
               >
                 {messages.map((msg, index) => (
-                  <ChatBubble
+                  <AnimatedMessageItem
                     key={msg.id || index.toString()}
                     msg={msg}
+                    onFadeOut={(id) => {
+                      setMessages((prev) => prev.filter((m) => m.id !== id));
+                    }}
                   />
                 ))}
               </ScrollView>
@@ -615,23 +656,14 @@ export const LiveStreamRoomScreen = ({ navigation, route }: any) => {
             )}
 
             {/* Host Action Bottom Bar */}
-            {!isChatFocused && isHost && !isAuctionEnded && (
+            {!isChatFocused && isHost && !isAuctionEnded && mode === 'auction' && (
               <View className="h-28 bg-transparent flex-row items-end justify-center px-4 pb-6" pointerEvents="box-none">
-                {mode === 'auction' ? (
-                  <TouchableOpacity
-                    className="bg-red-600/90 px-8 py-4 rounded-full border border-red-500 shadow-lg shadow-red-500/40"
-                    onPress={handleEndAuction}
-                  >
-                    <Text className="text-white font-black text-lg">🔨 Satışı Kapat</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    className="bg-red-600/90 px-8 py-4 rounded-full border border-red-500 shadow-lg shadow-red-500/40"
-                    onPress={() => { Alert.alert("Yayın", "Yayını bitirmek istiyor musunuz?"); }}
-                  >
-                    <Text className="text-white font-black text-lg">⏹ Yayını Bitir</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  className="bg-red-600/90 px-8 py-4 rounded-full border border-red-500 shadow-lg shadow-red-500/40"
+                  onPress={handleEndAuction}
+                >
+                  <Text className="text-white font-black text-lg">🔨 Satışı Kapat</Text>
+                </TouchableOpacity>
               </View>
             )}
 

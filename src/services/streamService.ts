@@ -16,7 +16,8 @@ export const streamService = {
         { 
           title: streamData.title, 
           status: 'live',
-          host_id: user.id 
+          host_id: user.id,
+          mode: streamData.mode // CRITICAL: Now saving the mode to the DB!
         }
       ])
       .select()
