@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CanlıSat",
+    "name": "CanliSat",
     "slug": "CanliSatApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Canlı yayın yapabilmek için kamera erişimi gerekiyor.",
         "NSMicrophoneUsageDescription": "Canlı yayında sesinin duyulabilmesi için mikrofon erişimi gerekiyor.",
-        "NSPhotoLibraryUsageDescription": "Ürün ve profil fotoğrafı seçebilmek için galeri erişimi gerekiyor."
+        "NSPhotoLibraryUsageDescription": "Ürün ve profil fotoğrafı seçebilmek için galeri erişimi gerekiyor.",
+        "CFBundleDisplayName": "CanlıSat"
       }
     },
     "android": {
@@ -52,6 +53,12 @@
         {
           "photosPermission": "Ürün ve profil fotoğrafı seçebilmek için galeri erişimi gerekiyor.",
           "cameraPermission": "Ürün fotoğrafı çekebilmek için kamera erişimi gerekiyor."
+        }
+      ],
+      [
+        "./plugins/withPodsDeploymentTarget",
+        {
+          "target": "16.4"
         }
       ]
     ]
