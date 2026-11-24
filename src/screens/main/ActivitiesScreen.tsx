@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Image, RefreshControl, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,7 +23,7 @@ type BidRow = {
   created_at: string;
 };
 
-export const ActivitiesScreen = ({ navigation }: any) => {
+export const ActivitiesScreen = ({ navigation, route }: any) => {
   const uid = useAuthStore((s) => s.user?.id);
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState<Tab>('orders');
@@ -31,6 +31,15 @@ export const ActivitiesScreen = ({ navigation }: any) => {
   const [bids, setBids] = useState<BidRow[]>([]);
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Profildeki kısayollardan belirli bir sekmeyle açılabilir
+  useEffect(() => {
+    const t = route.params?.tab as Tab | undefined;
+    if (t) {
+      setTab(t);
+      navigation.setParams({ tab: undefined });
+    }
+  }, [route.params?.tab, navigation]);
 
   const load = useCallback(async () => {
     if (!uid) return;
@@ -89,7 +98,7 @@ export const ActivitiesScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]" edges={['top']}>
-      <Text className="text-white text-3xl font-black px-4 pt-2 pb-4">Aktivite</Text>
+      <View className="h-2" />
       <Tabs tabs={[{ key: 'orders', label: 'Siparişlerim' }, { key: 'bids', label: 'Tekliflerim' }, { key: 'favorites', label: 'Favorilerim' }]} value={tab} onChange={setTab} />
 
       {tab === 'orders' && (
@@ -125,7 +134,10 @@ export const ActivitiesScreen = ({ navigation }: any) => {
                     <Text className="text-zinc-300 text-xs">{item.carrier} · Takip no: <Text className="font-bold text-white">{item.tracking_number}</Text></Text>
                   </View>
                 ) : null}
-                {item.status === 'shipped' && <Button small title="Teslim aldım" className="mt-3" onPress={() => confirmDelivered(item)} />}
+                <View className="flex-row mt-3">
+                  {item.status === 'shipped' && <Button small title="Teslim aldım" className="mr-2" onPress={() => confirmDelivered(item)} />}
+                  <Button small title="Satıcıya yaz" icon="chatbubble-ellipses-outline" variant="secondary" onPress={() => navigation.navigate('Chat', { userId: item.seller_id })} />
+                </View>
               </View>
             );
           }}

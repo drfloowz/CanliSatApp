@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -44,8 +44,7 @@ export const RegisterScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 12 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 12 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
           <TouchableOpacity onPress={() => navigation.goBack()} className="w-10 h-10 rounded-full bg-[#1A1A1A] items-center justify-center mb-6">
             <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
@@ -77,7 +76,6 @@ export const RegisterScreen = ({ navigation }: any) => {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

@@ -19,6 +19,7 @@ const ICONS: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: strin
   seller_approved: { icon: 'checkmark-circle', color: '#FF6B00' },
   seller_rejected: { icon: 'close-circle', color: '#EF4444' },
   referral: { icon: 'gift', color: '#A78BFA' },
+  message: { icon: 'chatbubble-ellipses', color: '#3B82F6' },
 };
 
 export const NotificationsScreen = ({ navigation }: any) => {
@@ -34,6 +35,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const open = (n: AppNotification) => {
+    if (n.type === 'message' && n.data?.conversation_id) return navigation.navigate('Chat', { conversationId: n.data.conversation_id });
     if (n.data?.stream_id && (n.type === 'stream_live' || n.type === 'outbid')) navigation.navigate('LiveRoom', { streamId: n.data.stream_id });
     else if (n.type === 'new_order') navigation.navigate('SellerOrders');
     else if (n.data?.order_id) navigation.navigate('MainTabs', { screen: 'Activities' });

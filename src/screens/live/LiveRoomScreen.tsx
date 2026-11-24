@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RtcSurfaceView } from 'react-native-agora';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 import { PRODUCT_SELECT, STREAM_SELECT, errorMessage, rpc, showError } from '../../lib/api';
@@ -51,7 +52,7 @@ export const LiveRoomScreen = ({ navigation, route }: any) => {
   const [sold, setSold] = useState<SoldBanner>(null);
   const usernames = useRef<Record<string, string>>({});
   const finalizing = useRef(false);
-  const chatRef = useRef<FlatList<ChatMessage>>(null);
+  const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
   const productRef = useRef<Product | null>(null);
   productRef.current = auctionProduct;
 
@@ -246,6 +247,17 @@ export const LiveRoomScreen = ({ navigation, route }: any) => {
     ]);
   };
 
+  const togglePause = async (paused: boolean) => {
+    if (!stream) return;
+    agora.setPaused(paused);
+    setStream((s) => (s ? { ...s, is_paused: paused } : s));
+    try {
+      await rpc('set_stream_paused', { p_stream_id: stream.id, p_paused: paused });
+    } catch (e) {
+      showError(e);
+    }
+  };
+
   const moreMenu = () => {
     if (!stream || !uid) return;
     Alert.alert('Seçenekler', undefined, [
@@ -275,28 +287,38 @@ export const LiveRoomScreen = ({ navigation, route }: any) => {
     <View className="flex-1 bg-black">
       {/* Video */}
       <View style={StyleSheet.absoluteFill}>
-        {isHost && agora.ready ? (
+        {/* Görüntü yalnızca gerçekten yayınlanıyorsa çizilir; aksi halde donmuş son kare yerine bilgi ekranı gösterilir */}
+        {isHost && agora.ready && !agora.videoOff && !stream.is_paused ? (
           <RtcSurfaceView canvas={{ uid: 0, renderMode: agora.renderMode }} style={StyleSheet.absoluteFill} />
-        ) : !isHost && agora.remoteUid !== null && !agora.remoteVideoMuted ? (
+        ) : null}
+        {!isHost && agora.remoteUid !== null && !stream.is_paused && agora.remoteVideo !== 'camera_off' ? (
           <RtcSurfaceView canvas={{ uid: agora.remoteUid, renderMode: agora.renderMode }} style={StyleSheet.absoluteFill} />
-        ) : (
-          <View className="flex-1 items-center justify-center px-10">
-            {agora.error ? (
-              <>
-                <Ionicons name="warning-outline" size={40} color="#F59E0B" />
-                <Text className="text-white text-center mt-3">{agora.error}</Text>
-              </>
-            ) : (
-              <>
-                <ActivityIndicator color="#FF6B00" />
-                <Text className="text-zinc-400 mt-3">{agora.remoteVideoMuted ? 'Satıcı görüntüyü duraklattı' : 'Yayına bağlanılıyor...'}</Text>
-              </>
-            )}
-          </View>
-        )}
-        {isHost && agora.error ? (
-          <View className="absolute top-1/3 left-6 right-6 bg-black/80 p-4 rounded-2xl">
-            <Text className="text-amber-400 font-bold text-center">{agora.error}</Text>
+        ) : null}
+
+        {agora.error ? (
+          <StatusOverlay stream={stream} icon="warning-outline" title="Bağlantı sorunu" subtitle={agora.error} />
+        ) : stream.is_paused ? (
+          <StatusOverlay
+            stream={stream}
+            icon="pause"
+            title={isHost ? 'Yayına ara verdin' : 'Yayına kısa bir ara verildi'}
+            subtitle={isHost ? 'İzleyicilerin seni görmüyor ve duymuyor. Hazır olduğunda devam et.' : 'Satıcı birazdan geri dönecek, ayrılma 👋'}
+            action={isHost ? <Button title="Yayına devam et" icon="play" onPress={() => togglePause(false)} /> : undefined}
+          />
+        ) : isHost && agora.videoOff ? (
+          <StatusOverlay stream={stream} icon="videocam-off" title="Kameran kapalı" subtitle="İzleyiciler sadece sesini duyuyor." />
+        ) : isHost && !agora.ready ? (
+          <StatusOverlay stream={stream} loading title="Kamera açılıyor..." />
+        ) : !isHost && agora.remoteVideo === 'camera_off' ? (
+          <StatusOverlay stream={stream} icon="videocam-off" title="Satıcı kamerasını kapattı" subtitle="Görüntü birazdan geri gelecek." />
+        ) : !isHost && agora.remoteUid === null ? (
+          <StatusOverlay stream={stream} loading title="Yayına bağlanılıyor..." />
+        ) : !isHost && agora.remoteVideo === 'waiting' ? (
+          <StatusOverlay stream={stream} loading title="Görüntü yükleniyor..." />
+        ) : !isHost && agora.remoteVideo === 'frozen' ? (
+          <View className="absolute top-1/2 self-center bg-black/70 px-4 py-2 rounded-full flex-row items-center">
+            <ActivityIndicator color="#FF6B00" size="small" />
+            <Text className="text-white ml-2 font-semibold">Bağlantı zayıf...</Text>
           </View>
         ) : null}
       </View>
@@ -351,12 +373,16 @@ export const LiveRoomScreen = ({ navigation, route }: any) => {
         {isHost && (
           <View className="absolute right-3" style={{ top: insets.top + 64 }}>
             {[
-              { icon: 'camera-reverse-outline', on: agora.switchCamera, active: false },
-              { icon: agora.muted ? 'mic-off' : 'mic', on: agora.toggleMic, active: agora.muted },
-              { icon: agora.videoOff ? 'videocam-off' : 'videocam', on: agora.toggleVideo, active: agora.videoOff },
-            ].map((b, i) => (
-              <TouchableOpacity key={i} onPress={b.on} className="w-11 h-11 rounded-full bg-black/50 items-center justify-center mb-3">
-                <Ionicons name={b.icon as any} size={20} color={b.active ? '#EF4444' : '#fff'} />
+              { icon: stream.is_paused ? 'play' : 'pause', label: stream.is_paused ? 'Devam' : 'Ara ver', on: () => togglePause(!stream.is_paused), active: !!stream.is_paused },
+              { icon: 'camera-reverse-outline', label: 'Çevir', on: agora.switchCamera, active: false },
+              { icon: agora.muted ? 'mic-off' : 'mic', label: 'Mikrofon', on: agora.toggleMic, active: agora.muted },
+              { icon: agora.videoOff ? 'videocam-off' : 'videocam', label: 'Kamera', on: agora.toggleVideo, active: agora.videoOff },
+            ].map((b) => (
+              <TouchableOpacity key={b.label} onPress={b.on} disabled={!!stream.is_paused && b.label !== 'Devam'} className="items-center mb-2.5">
+                <View className={`w-11 h-11 rounded-full items-center justify-center ${b.active ? 'bg-[#FF6B00]' : 'bg-black/50'}`}>
+                  <Ionicons name={b.icon as any} size={20} color="#fff" />
+                </View>
+                <Text className="text-white text-[10px] font-semibold mt-1">{b.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -367,11 +393,11 @@ export const LiveRoomScreen = ({ navigation, route }: any) => {
         {/* Sohbet */}
         <View className="px-3 max-h-[220px] w-[78%]" pointerEvents="box-none">
           <FlatList
-            data={messages}
+            data={reversedMessages}
             keyExtractor={(m) => m.id}
-            ref={chatRef}
+            inverted
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: true })}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) =>
               item.kind === 'system' ? (
                 <View className="bg-[#FF6B00]/85 self-start rounded-xl px-3 py-1.5 mb-1.5">
@@ -524,6 +550,41 @@ export const LiveRoomScreen = ({ navigation, route }: any) => {
     </View>
   );
 };
+
+// ---------- Görüntü yokken gösterilen bilgi ekranı ----------
+const StatusOverlay = ({
+  stream,
+  icon,
+  title,
+  subtitle,
+  loading,
+  action,
+}: {
+  stream: Stream;
+  icon?: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  loading?: boolean;
+  action?: React.ReactNode;
+}) => (
+  <View style={StyleSheet.absoluteFill} className="items-center justify-center px-10">
+    {stream.cover_url ? (
+      <Image source={{ uri: stream.cover_url }} style={StyleSheet.absoluteFill} blurRadius={30} />
+    ) : null}
+    <LinearGradient colors={['rgba(42,22,7,0.92)', 'rgba(8,8,8,0.97)']} style={StyleSheet.absoluteFill} />
+    <View className="items-center">
+      <View className="p-1 rounded-full border-2 border-[#FF6B00]">
+        <Avatar uri={stream.host?.avatar_url} name={stream.host?.username} size={84} />
+      </View>
+      <View className="flex-row items-center bg-white/10 px-4 py-2 rounded-full mt-5">
+        {loading ? <ActivityIndicator color="#FF6B00" size="small" /> : <Ionicons name={icon ?? 'pause'} size={16} color="#FF6B00" />}
+        <Text className="text-white font-bold ml-2">{title}</Text>
+      </View>
+      {subtitle ? <Text className="text-zinc-400 text-center mt-3 leading-5">{subtitle}</Text> : null}
+      {action ? <View className="mt-6 w-64">{action}</View> : null}
+    </View>
+  </View>
+);
 
 // ---------- Yayıncı: mezat başlatma ----------
 const StartAuctionSheet = ({ visible, onClose, streamId, sellerId, navigation }: { visible: boolean; onClose: () => void; streamId: string; sellerId: string; navigation: any }) => {

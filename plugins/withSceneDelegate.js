@@ -12,6 +12,7 @@ const SCENE_DELEGATE = `
 ${MARKER}
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   var window: UIWindow?
+  private var hiddenObserver: NSObjectProtocol?
 
   func scene(
     _ scene: UIScene,
@@ -26,6 +27,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     self.window = window
     appDelegate.window = window
     factory.startReactNative(withModuleName: "main", in: window, launchOptions: appDelegate.launchOptions)
+
+    // Expo geliştirici menüsü gibi yardımcı pencereler kapandığında "key window" olarak kalabiliyor;
+    // bu durumda fotoğraf seçici gibi ekranlar görünmeyen pencereye açılıyor. Ana pencereyi geri al.
+    hiddenObserver = NotificationCenter.default.addObserver(
+      forName: UIWindow.didBecomeHiddenNotification, object: nil, queue: .main
+    ) { [weak self] note in
+      guard let main = self?.window, let hidden = note.object as? UIWindow, hidden !== main else { return }
+      if !main.isKeyWindow { main.makeKey() }
+    }
 
     if let url = connectionOptions.urlContexts.first?.url {
       _ = RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])

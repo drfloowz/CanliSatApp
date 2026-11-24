@@ -11,12 +11,14 @@ import { STREAM_SELECT, showError } from '../../lib/api';
 import { Chip, EmptyState, Section } from '../../components/ui';
 import { StreamCard } from '../../components/cards';
 import { useUnreadCount } from '../../hooks/useUnreadCount';
+import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import type { Stream } from '../../types';
 
 export const HomeScreen = ({ navigation }: any) => {
   const { width } = useWindowDimensions();
   const uid = useAuthStore((s) => s.user?.id);
   const unread = useUnreadCount();
+  const unreadMessages = useUnreadMessages();
   const [filter, setFilter] = useState<string>('all');
   const [live, setLive] = useState<Stream[]>([]);
   const [upcoming, setUpcoming] = useState<Stream[]>([]);
@@ -84,6 +86,14 @@ export const HomeScreen = ({ navigation }: any) => {
         <View className="flex-row">
           <TouchableOpacity onPress={() => navigation.navigate('Discover')} className="w-10 h-10 items-center justify-center">
             <Ionicons name="search" size={24} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Inbox')} className="w-10 h-10 items-center justify-center">
+            <Ionicons name="chatbubble-ellipses-outline" size={24} color="#fff" />
+            {unreadMessages > 0 && (
+              <View className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#FF6B00] items-center justify-center">
+                <Text className="text-white text-[10px] font-bold">{unreadMessages > 9 ? '9+' : unreadMessages}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Notifications')} className="w-10 h-10 items-center justify-center">
             <Ionicons name="notifications-outline" size={24} color="#fff" />

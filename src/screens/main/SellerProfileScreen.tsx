@@ -116,7 +116,10 @@ export const SellerProfileScreen = ({ navigation, route }: any) => {
             <Stat value={sold} label="Satış" />
           </View>
           {!mine && (
-            <Button title={isFollowing ? 'Takip ediliyor' : 'Takip et'} variant={isFollowing ? 'secondary' : 'primary'} className="w-full mt-5" onPress={toggleFollow} />
+            <View className="flex-row w-full mt-5">
+              <Button title={isFollowing ? 'Takip ediliyor' : 'Takip et'} variant={isFollowing ? 'secondary' : 'primary'} className="flex-1 mr-2" onPress={toggleFollow} />
+              <Button title="Mesaj gönder" icon="chatbubble-ellipses-outline" variant="secondary" className="flex-1" onPress={() => navigation.navigate('Chat', { userId })} />
+            </View>
           )}
         </View>
 

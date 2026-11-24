@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -90,8 +90,7 @@ const SellerApply = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]" edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-        <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
           <TouchableOpacity onPress={() => setShowForm(false)} className="mb-4">
             <Ionicons name="chevron-back" size={26} color="#fff" />
           </TouchableOpacity>
@@ -110,7 +109,6 @@ const SellerApply = () => {
           <Field label="Ne satıyorsun?" placeholder="Kısaca ürünlerinden ve deneyiminden bahset" multiline value={description} onChangeText={setDescription} />
           <Button title="Başvuruyu gönder" loading={saving} onPress={submit} />
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
+import { ScrollView, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -30,15 +30,13 @@ export const EditProfileScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]">
       <Header title="Hesap bilgilerim" />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
           <Field label="Ad Soyad" value={fullName} onChangeText={setFullName} />
           <Field label="Kullanıcı adı" autoCapitalize="none" value={username} onChangeText={setUsername} />
           <Field label="Hakkımda" multiline maxLength={160} placeholder="Kendinden veya mağazandan kısaca bahset" value={bio} onChangeText={setBio} />
           <Text className="text-zinc-500 text-xs mb-6">E-posta: {user?.email}</Text>
           <Button title="Kaydet" loading={saving} onPress={save} />
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

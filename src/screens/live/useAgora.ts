@@ -5,22 +5,27 @@ import {
   ClientRoleType,
   createAgoraRtcEngine,
   IRtcEngine,
+  RemoteVideoState,
+  RemoteVideoStateReason,
   RenderModeType,
 } from 'react-native-agora';
 import { supabase } from '../../services/supabase';
+
+/** İzleyici tarafında yayıncının görüntü durumu */
+export type RemoteVideo = 'waiting' | 'playing' | 'camera_off' | 'frozen';
 
 type AgoraState = {
   ready: boolean;
   joined: boolean;
   remoteUid: number | null;
-  remoteVideoMuted: boolean;
+  remoteVideo: RemoteVideo;
   error: string | null;
 };
 
 /** Yayın kanalına bağlanır. Token sunucudan (agora-token edge function) alınır. */
 export const useAgora = (streamId: string | undefined, isHost: boolean, enabled: boolean) => {
   const engine = useRef<IRtcEngine | null>(null);
-  const [state, setState] = useState<AgoraState>({ ready: false, joined: false, remoteUid: null, remoteVideoMuted: false, error: null });
+  const [state, setState] = useState<AgoraState>({ ready: false, joined: false, remoteUid: null, remoteVideo: 'waiting', error: null });
   const [muted, setMuted] = useState(false);
   const [videoOff, setVideoOff] = useState(false);
 
@@ -53,9 +58,21 @@ export const useAgora = (streamId: string | undefined, isHost: boolean, enabled:
         e.initialize({ appId: data.appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting });
         e.registerEventHandler({
           onJoinChannelSuccess: () => setState((s) => ({ ...s, joined: true })),
-          onUserJoined: (_c, uid) => setState((s) => ({ ...s, remoteUid: uid, remoteVideoMuted: false })),
-          onUserOffline: (_c, uid) => setState((s) => (s.remoteUid === uid ? { ...s, remoteUid: null } : s)),
-          onUserMuteVideo: (_c, _uid, m) => setState((s) => ({ ...s, remoteVideoMuted: m })),
+          onUserJoined: (_c, uid) => setState((s) => ({ ...s, remoteUid: uid, remoteVideo: 'waiting' })),
+          onUserOffline: (_c, uid) => setState((s) => (s.remoteUid === uid ? { ...s, remoteUid: null, remoteVideo: 'waiting' } : s)),
+          onRemoteVideoStateChanged: (_c, uid, st, reason) => {
+            let next: RemoteVideo | null = null;
+            if (st === RemoteVideoState.RemoteVideoStateDecoding) next = 'playing';
+            else if (st === RemoteVideoState.RemoteVideoStateFrozen) next = 'frozen';
+            else if (
+              st === RemoteVideoState.RemoteVideoStateStopped &&
+              (reason === RemoteVideoStateReason.RemoteVideoStateReasonRemoteMuted ||
+                reason === RemoteVideoStateReason.RemoteVideoStateReasonLocalMuted)
+            )
+              next = 'camera_off';
+            else if (st === RemoteVideoState.RemoteVideoStateStopped) next = 'waiting';
+            if (next) setState((s) => ({ ...s, remoteUid: s.remoteUid ?? uid, remoteVideo: next! }));
+          },
           onError: (err, msg) => console.warn('Agora hata', err, msg),
         });
         e.enableVideo();
@@ -84,21 +101,27 @@ export const useAgora = (streamId: string | undefined, isHost: boolean, enabled:
     };
   }, [streamId, isHost, enabled]);
 
+  const setCamera = (off: boolean) => {
+    engine.current?.muteLocalVideoStream(off);
+    engine.current?.enableLocalVideo(!off);
+    setVideoOff(off);
+  };
+  const setMic = (off: boolean) => {
+    engine.current?.muteLocalAudioStream(off);
+    setMuted(off);
+  };
+
   return {
     ...state,
     renderMode: RenderModeType.RenderModeHidden,
     muted,
     videoOff,
-    toggleMic: () => {
-      const next = !muted;
-      engine.current?.muteLocalAudioStream(next);
-      setMuted(next);
-    },
-    toggleVideo: () => {
-      const next = !videoOff;
-      engine.current?.muteLocalVideoStream(next);
-      engine.current?.enableLocalVideo(!next);
-      setVideoOff(next);
+    toggleMic: () => setMic(!muted),
+    toggleVideo: () => setCamera(!videoOff),
+    /** Ara ver: kamera ve mikrofon birlikte kapanır/açılır */
+    setPaused: (paused: boolean) => {
+      setCamera(paused);
+      setMic(paused);
     },
     switchCamera: () => engine.current?.switchCamera(),
   };

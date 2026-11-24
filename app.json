@@ -61,7 +61,8 @@
           "target": "16.4"
         }
       ],
-      "./plugins/withSceneDelegate"
+      "./plugins/withSceneDelegate",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

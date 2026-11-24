@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -19,8 +19,10 @@ export const DiscoverScreen = ({ navigation }: any) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [streams, setStreams] = useState<Stream[]>([]);
   const [sellers, setSellers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const search = useCallback(async () => {
+    setLoading(true);
     const q = query.trim().replace(/[%,()]/g, ' ');
     if (mode === 'products') {
       let req = supabase.from('products').select(PRODUCT_SELECT).in('status', ['active', 'in_auction']).order('created_at', { ascending: false }).limit(60);
@@ -40,9 +42,11 @@ export const DiscoverScreen = ({ navigation }: any) => {
       const { data } = await req;
       setSellers((data as Profile[]) ?? []);
     }
+    setLoading(false);
   }, [query, mode, category]);
 
   useEffect(() => {
+    setLoading(true);
     const t = setTimeout(search, 300);
     return () => clearTimeout(t);
   }, [search]);
@@ -52,7 +56,6 @@ export const DiscoverScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]" edges={['top']}>
       <View className="px-4 pt-2">
-        <Text className="text-white text-3xl font-black mb-3">Keşfet</Text>
         <View className="flex-row items-center bg-[#1A1A1A] border border-[#2A2A2A] rounded-2xl px-4 h-12">
           <Ionicons name="search" size={20} color="#9CA3AF" />
           <TextInput
@@ -99,7 +102,9 @@ export const DiscoverScreen = ({ navigation }: any) => {
           </ScrollView>
         )}
 
-        {mode === 'products' && (
+        {loading && <ActivityIndicator color="#FF6B00" style={{ marginTop: 40 }} />}
+
+        {!loading && mode === 'products' && (
           products.length === 0 ? (
             <EmptyState icon="pricetag-outline" title="Ürün bulunamadı" subtitle="Farklı bir arama veya kategori dene." />
           ) : (
@@ -109,7 +114,7 @@ export const DiscoverScreen = ({ navigation }: any) => {
           )
         )}
 
-        {mode === 'streams' && (
+        {!loading && mode === 'streams' && (
           streams.length === 0 ? (
             <EmptyState icon="radio-outline" title="Yayın bulunamadı" />
           ) : (
@@ -126,7 +131,7 @@ export const DiscoverScreen = ({ navigation }: any) => {
           )
         )}
 
-        {mode === 'sellers' && (
+        {!loading && mode === 'sellers' && (
           <View className="px-4 pt-4">
             {sellers.length === 0 ? <EmptyState icon="storefront-outline" title="Satıcı bulunamadı" /> : null}
             {sellers.map((s) => (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -102,8 +102,7 @@ export const ProductFormScreen = ({ navigation, route }: any) => {
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]">
       <Header title={productId ? 'Ürünü düzenle' : 'Ürün ekle'} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
           {status === 'in_auction' && (
             <View className="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-3 mb-4">
               <Text className="text-amber-400 font-semibold">Bu ürün şu an mezatta, mezat bitene kadar düzenlenemez.</Text>
@@ -168,7 +167,6 @@ export const ProductFormScreen = ({ navigation, route }: any) => {
           <Button title="Kaydet" loading={saving} disabled={status === 'in_auction'} onPress={save} />
           {productId && status !== 'in_auction' && <Button title="Ürünü kaldır" variant="danger" className="mt-3" onPress={archive} />}
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

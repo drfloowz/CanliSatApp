@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -91,8 +91,7 @@ export const AddressFormScreen = ({ navigation, route }: any) => {
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]">
       <Header title={editing ? 'Adresi düzenle' : 'Yeni adres'} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
           <Field label="Adres başlığı" placeholder="Ev, İş..." value={title} onChangeText={setTitle} />
           <Field label="Ad Soyad" value={fullName} onChangeText={setFullName} />
           <Field label="Telefon" keyboardType="phone-pad" placeholder="05xx xxx xx xx" value={phone} onChangeText={setPhone} />
@@ -103,7 +102,6 @@ export const AddressFormScreen = ({ navigation, route }: any) => {
           <Field label="Açık adres" multiline placeholder="Mahalle, sokak, bina no, daire" value={line} onChangeText={setLine} />
           <Button title="Kaydet" loading={saving} onPress={save} />
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

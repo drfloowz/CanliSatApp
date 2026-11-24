@@ -25,6 +25,7 @@ export type Stream = {
   scheduled_at: string | null;
   started_at: string | null;
   viewer_count: number;
+  is_paused?: boolean;
   current_auction_id: string | null;
   created_at: string;
   host?: Pick<Profile, 'id' | 'username' | 'avatar_url' | 'full_name'> | null;

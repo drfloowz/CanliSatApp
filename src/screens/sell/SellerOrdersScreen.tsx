@@ -10,7 +10,7 @@ import { rpc, showError } from '../../lib/api';
 import { Badge, Button, Chip, EmptyState, Field, Header, Tabs } from '../../components/ui';
 import type { Order } from '../../types';
 
-export const SellerOrdersScreen = () => {
+export const SellerOrdersScreen = ({ navigation }: any) => {
   const uid = useAuthStore((s) => s.user?.id);
   const [tab, setTab] = useState<'open' | 'done'>('open');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -86,6 +86,7 @@ export const SellerOrdersScreen = () => {
                 <Text className="text-amber-400 text-xs mt-3">Alıcı adres eklememiş.</Text>
               )}
               {item.tracking_number ? <Text className="text-zinc-400 text-xs mt-2">{item.carrier}: {item.tracking_number}</Text> : null}
+              <Button small title="Alıcıya yaz" icon="chatbubble-ellipses-outline" variant="secondary" className="mt-3 self-start" onPress={() => navigation.navigate('Chat', { userId: item.buyer_id })} />
               {tab === 'open' && (
                 <View className="flex-row mt-3">
                   <Button small title="Kargoya verdim" icon="cube" className="mr-2" onPress={() => setShipping(item)} />

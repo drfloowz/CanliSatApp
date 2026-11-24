@@ -20,6 +20,8 @@ Tek geliştirici projesi; amaç App Store'a çıkıp gelir elde etmek. Kullanıc
 - Paket testi: `npx expo export --platform ios`
 - Cihazda çalıştır: `npx expo run:ios --device` (Agora ve image-picker native modül, Expo Go'da çalışmaz)
 - Native ayar değişince (app.json, yeni native paket): `npx expo prebuild --clean` sonra tekrar `run:ios`
+- DİKKAT: `npx expo install <paket>` Expo'yu SDK 57'ye yükseltebiliyor (bir kez oldu, uygulama açılışta çöktü). Yeni paketi kurduktan sonra `git diff package.json` ile `expo` sürümünün `~56` kaldığını kontrol et; gerekirse sürümü `expo/bundledNativeModules.json`'dan bakıp `npm install paket@sürüm` ile kur.
+- Xcode 27 için `plugins/withPodsDeploymentTarget.js` ve `plugins/withSceneDelegate.js` gerekli; CocoaPods için kabukta `LANG=en_US.UTF-8` olmalı.
 
 ## Yapı
 - `src/screens/Auth/` giriş/kayıt · `main/` sekmeler, ürün detayı, satıcı profili · `live/` canlı yayın + mezat · `sell/` satıcı paneli, ürün/yayın formları, siparişler · `profile/` profil alt sayfaları, admin

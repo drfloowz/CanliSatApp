@@ -16,6 +16,8 @@ import { AddressesScreen, AddressFormScreen } from '../screens/profile/Addresses
 import { NotificationsScreen } from '../screens/profile/NotificationsScreen';
 import { AdminScreen } from '../screens/profile/AdminScreen';
 import { LegalScreen } from '../screens/profile/LegalScreen';
+import { InboxScreen } from '../screens/messages/InboxScreen';
+import { ChatScreen } from '../screens/messages/ChatScreen';
 import { Loading } from '../components/ui';
 
 const Stack = createNativeStackNavigator();
@@ -44,6 +46,8 @@ export const AppNavigator = () => {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="Admin" component={AdminScreen} />
           <Stack.Screen name="Legal" component={LegalScreen} />
+          <Stack.Screen name="Inbox" component={InboxScreen} />
+          <Stack.Screen name="Chat" component={ChatScreen} />
         </>
       ) : (
         <>

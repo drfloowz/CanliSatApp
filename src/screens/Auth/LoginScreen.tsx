@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
@@ -30,8 +30,7 @@ export const LoginScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#0E0E0E]">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
           <View className="items-center mb-10">
             <View className="w-20 h-20 rounded-3xl bg-[#1A1A1A] items-center justify-center mb-5">
               <Ionicons name="hammer" size={36} color="#FF6B00" />
@@ -67,7 +66,6 @@ export const LoginScreen = ({ navigation }: any) => {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
