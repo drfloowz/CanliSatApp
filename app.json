@@ -60,7 +60,8 @@
         {
           "target": "16.4"
         }
-      ]
+      ],
+      "./plugins/withSceneDelegate"
     ]
   }
 }
