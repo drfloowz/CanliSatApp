@@ -1,119 +1,82 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
-import { authService } from '../../../src/services/authService';
-import { useAuthStore } from '../../store/useAuthStore';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../services/supabase';
+import { Button, Field } from '../../components/ui';
+import { errorMessage } from '../../lib/api';
 
 export const RegisterScreen = ({ navigation }: any) => {
-  const { t } = useTranslation();
+  const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [error, setError] = useState('');
 
-  const setIsSigningUp = useAuthStore((state) => state.setIsSigningUp);
+  const register = async () => {
+    const uname = username.trim().toLowerCase();
+    if (!fullName.trim() || !uname || !email.trim() || !password) return setError('Lütfen tüm alanları doldurun.');
+    if (!/^[a-z0-9_.]{3,24}$/.test(uname)) return setError('Kullanıcı adı 3-24 karakter; küçük harf, rakam, _ ve . içerebilir.');
+    if (password.length < 6) return setError('Şifre en az 6 karakter olmalı.');
+    if (!accepted) return setError('Devam etmek için kullanım koşullarını kabul etmelisiniz.');
 
-  const handleRegister = async () => {
-    if (!username || !email || !password) {
-      setErrorMsg('Lütfen tüm alanları doldurun.');
-      return;
-    }
-    
     setLoading(true);
-    setErrorMsg('');
-    setIsSigningUp(true);
-    
-    try {
-      await authService.register(email, password, username);
-      // Çıkış yaparak kullanıcının otomatik girişini önle
-      await authService.logout();
-      Alert.alert(t('register.successTitle'), t('register.successMessage'));
-      navigation.navigate('Login');
-    } catch (error: any) {
-      setErrorMsg(error.message || 'Kayıt olurken bir hata oluştu.');
-    } finally {
-      setIsSigningUp(false);
+    setError('');
+    const { data: taken } = await supabase.from('profiles').select('id').eq('username', uname).maybeSingle();
+    if (taken) {
       setLoading(false);
+      return setError('Bu kullanıcı adı alınmış.');
+    }
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: { data: { username: uname, full_name: fullName.trim() } },
+    });
+    setLoading(false);
+    if (error) return setError(errorMessage(error));
+    if (!data.session) {
+      Alert.alert('Neredeyse bitti', 'E-posta adresine bir onay bağlantısı gönderdik. Onayladıktan sonra giriş yapabilirsin.');
+      navigation.navigate('Login');
     }
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#121212]" edges={['top', 'bottom']}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1 justify-center px-6"
-      >
-        <View className="items-center mb-10">
-          <Text className="text-4xl font-extrabold text-white tracking-tight mb-2">{t('register.title')}</Text>
-          <Text className="text-zinc-400 text-base">{t('register.subtitle')}</Text>
-        </View>
+    <SafeAreaView className="flex-1 bg-[#0E0E0E]">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 12 }} keyboardShouldPersistTaps="handled">
+          <TouchableOpacity onPress={() => navigation.goBack()} className="w-10 h-10 rounded-full bg-[#1A1A1A] items-center justify-center mb-6">
+            <Ionicons name="chevron-back" size={22} color="#fff" />
+          </TouchableOpacity>
+          <Text className="text-white text-3xl font-black">Yeni hesap oluştur</Text>
+          <Text className="text-zinc-400 mt-2 mb-8">Canlı mezatlara katılmak için hemen üye ol.</Text>
 
-        <View className="gap-6">
-          {errorMsg ? (
-            <View className="bg-red-500/20 p-4 rounded-2xl border border-red-500/50">
-              <Text className="text-red-400 text-sm font-semibold text-center">{errorMsg}</Text>
+          {error ? (
+            <View className="bg-red-500/15 border border-red-500/40 rounded-2xl p-3 mb-4">
+              <Text className="text-red-400 text-center font-semibold">{error}</Text>
             </View>
           ) : null}
 
-          <View>
-            <Text className="text-zinc-300 font-bold mb-2 ml-1">Kullanıcı Adı</Text>
-            <TextInput 
-              className="w-full bg-[#1E1E1E] text-white px-5 py-4 rounded-2xl border border-transparent focus:border-[#FF6B00] transition-colors font-medium"
-              placeholder="Kullanıcı adınız"
-              placeholderTextColor="#71717a"
-              autoCapitalize="none"
-              value={username}
-              onChangeText={setUsername}
-            />
-          </View>
+          <Field label="Ad Soyad" placeholder="Adınız Soyadınız" value={fullName} onChangeText={setFullName} />
+          <Field label="Kullanıcı adı" placeholder="ornek_kullanici" autoCapitalize="none" value={username} onChangeText={setUsername} />
+          <Field label="E-posta" placeholder="ornek@email.com" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
+          <Field label="Şifre" placeholder="En az 6 karakter" secureTextEntry value={password} onChangeText={setPassword} />
 
-          <View>
-            <Text className="text-zinc-300 font-bold mb-2 ml-1">{t('register.emailLabel')}</Text>
-            <TextInput 
-              className="w-full bg-[#1E1E1E] text-white px-5 py-4 rounded-2xl border border-transparent focus:border-[#FF6B00] transition-colors font-medium"
-              placeholder={t('register.emailPlaceholder')}
-              placeholderTextColor="#71717a"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-
-          <View>
-            <Text className="text-zinc-300 font-bold mb-2 ml-1">{t('register.passwordLabel')}</Text>
-            <TextInput 
-              className="w-full bg-[#1E1E1E] text-white px-5 py-4 rounded-2xl border border-transparent focus:border-[#FF6B00] transition-colors font-medium"
-              placeholder={t('register.passwordPlaceholder')}
-              placeholderTextColor="#71717a"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
-
-          <TouchableOpacity 
-            onPress={handleRegister}
-            disabled={loading}
-            className={`w-full ${loading ? 'opacity-70' : 'opacity-100'} bg-[#FF6B00] mt-4 py-4 rounded-2xl items-center shadow-lg shadow-orange-500/30 active:opacity-80 flex-row justify-center`}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" className="mr-2" />
-            ) : null}
-            <Text className="text-white font-black text-lg tracking-wide">
-              {loading ? 'Yükleniyor...' : t('register.button')}
+          <TouchableOpacity onPress={() => setAccepted(!accepted)} className="flex-row items-start mb-6">
+            <Ionicons name={accepted ? 'checkbox' : 'square-outline'} size={22} color={accepted ? '#FF6B00' : '#6B7280'} />
+            <Text className="text-zinc-400 ml-2 flex-1 leading-5">
+              Kullanım Koşulları’nı ve Gizlilik Politikası’nı okudum, kabul ediyorum. Mezatta verdiğim tekliflerin bağlayıcı olduğunu biliyorum.
             </Text>
           </TouchableOpacity>
-        </View>
 
-        <View className="flex-row justify-center mt-10">
-          <Text className="text-zinc-400 text-sm font-medium">{t('register.hasAccount')}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loading}>
-            <Text className="text-[#FF6B00] font-bold text-sm ml-1">{t('register.loginLink')}</Text>
+          <Button title="Kayıt Ol" onPress={register} loading={loading} />
+          <TouchableOpacity onPress={() => navigation.navigate('Login')} className="mt-8 items-center">
+            <Text className="text-zinc-400">
+              Zaten hesabın var mı? <Text className="text-[#FF6B00] font-bold">Giriş yap</Text>
+            </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

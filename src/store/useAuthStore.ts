@@ -1,37 +1,51 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
+import type { Profile } from '../types';
 
 interface AuthState {
+  ready: boolean;
   isAuthenticated: boolean;
-  isSigningUp: boolean;
   session: Session | null;
-  role: string | null;
   user: User | null;
-  setIsSigningUp: (value: boolean) => void;
+  profile: Profile | null;
   initialize: () => void;
+  refreshProfile: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
+let initialized = false;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
+  ready: false,
   isAuthenticated: false,
-  isSigningUp: false,
   session: null,
-  role: null,
   user: null,
-  
-  setIsSigningUp: (value) => set({ isSigningUp: value }),
+  profile: null,
 
   initialize: () => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      set({ session, isAuthenticated: !!session, user: session?.user || null });
-    });
+    if (initialized) return;
+    initialized = true;
 
+    const apply = async (session: Session | null) => {
+      set({ session, isAuthenticated: !!session, user: session?.user ?? null });
+      if (session) await get().refreshProfile();
+      else set({ profile: null });
+      set({ ready: true });
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => apply(session));
     supabase.auth.onAuthStateChange((_event, session) => {
-      // Kayıt olma esnasındaysa otomatik girişi (state güncellemesini) engelle
-      if (get().isSigningUp) return;
-      set({ session, isAuthenticated: !!session, user: session?.user || null });
+      // onAuthStateChange içinde await yapılmamalı (supabase-js kilitlenmesi)
+      setTimeout(() => apply(session), 0);
     });
+  },
+
+  refreshProfile: async () => {
+    const uid = get().user?.id;
+    if (!uid) return;
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+    if (data) set({ profile: data as Profile });
   },
 
   logout: async () => {
@@ -39,5 +53,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-// Initialize the listener immediately
 useAuthStore.getState().initialize();

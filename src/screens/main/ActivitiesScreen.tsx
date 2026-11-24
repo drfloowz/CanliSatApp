@@ -1,178 +1,176 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, FlatList, Image, RefreshControl, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../../services/supabase';
+import { useAuthStore } from '../../store/useAuthStore';
+import { ORDER_STATUS_LABEL, formatTL, timeAgo } from '../../lib/format';
+import { PRODUCT_SELECT, rpc, showError } from '../../lib/api';
+import { Badge, Button, EmptyState, Tabs } from '../../components/ui';
+import { ProductCard } from '../../components/cards';
+import type { Order, Product } from '../../types';
 
-export const ActivitiesScreen = () => {
-  const [activeTab, setActiveTab] = useState<'cart' | 'favorites'>('cart');
+type Tab = 'orders' | 'bids' | 'favorites';
 
-  // Mock Cart Data
-  const [cartItems, setCartItems] = useState([
-    { id: '1', title: 'Vintage Deri Ceket', seller: '@vintageshop', price: 1200, qty: 1, image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&q=80' },
-    { id: '2', title: 'Air Jordan 1 Retro High', seller: '@sneakerhead', price: 4200, qty: 1, image: 'https://images.unsplash.com/photo-1552346154-21d32810baa3?w=400&q=80' },
-  ]);
+type BidRow = {
+  auction_id: string;
+  my_max: number;
+  product_title: string;
+  product_image: string | null;
+  current_price: number;
+  status: string;
+  winning: boolean;
+  created_at: string;
+};
 
-  // Mock Favorites Data (From our previous Watchlist)
-  const favorites = [
-    { id: '1', title: 'PlayStation 5 Kapalı Kutu', seller: '@gamestore', price: '18.500₺', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=400&q=80', isLive: true, viewers: 124 },
-    { id: '3', title: 'MacBook Pro M2 16GB', seller: '@techpazari', price: '32.000₺', image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&q=80', isLive: false, time: 'Yarın 19:30' },
-  ];
+export const ActivitiesScreen = ({ navigation }: any) => {
+  const uid = useAuthStore((s) => s.user?.id);
+  const { width } = useWindowDimensions();
+  const [tab, setTab] = useState<Tab>('orders');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [bids, setBids] = useState<BidRow[]>([]);
+  const [favorites, setFavorites] = useState<Product[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const updateQty = (id: string, delta: number) => {
-    setCartItems(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(1, item.qty + delta);
-        return { ...item, qty: newQty };
-      }
-      return item;
-    }));
-  };
+  const load = useCallback(async () => {
+    if (!uid) return;
+    if (tab === 'orders') {
+      const { data } = await supabase
+        .from('orders')
+        .select('*, seller:profiles!orders_seller_id_fkey(id, username)')
+        .eq('buyer_id', uid)
+        .order('created_at', { ascending: false });
+      setOrders((data as Order[]) ?? []);
+    } else if (tab === 'bids') {
+      const { data } = await supabase
+        .from('bids')
+        .select('auction_id, amount, created_at, auction:auctions(id, status, current_price, current_winner_id, product:products(title, images))')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      const map = new Map<string, BidRow>();
+      (data ?? []).forEach((b: any) => {
+        const prev = map.get(b.auction_id);
+        if (prev) {
+          prev.my_max = Math.max(prev.my_max, Number(b.amount));
+          return;
+        }
+        map.set(b.auction_id, {
+          auction_id: b.auction_id,
+          my_max: Number(b.amount),
+          product_title: b.auction?.product?.title ?? 'Ürün',
+          product_image: b.auction?.product?.images?.[0] ?? null,
+          current_price: Number(b.auction?.current_price ?? 0),
+          status: b.auction?.status,
+          winning: b.auction?.current_winner_id === uid,
+          created_at: b.created_at,
+        });
+      });
+      setBids([...map.values()]);
+    } else {
+      const { data } = await supabase
+        .from('favorites')
+        .select(`product:products(${PRODUCT_SELECT})`)
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false });
+      setFavorites(((data ?? []) as any[]).map((r) => r.product).filter(Boolean));
+    }
+  }, [uid, tab]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const removeCartItem = (id: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
-  };
+  const confirmDelivered = (o: Order) =>
+    Alert.alert('Teslim aldın mı?', o.product_title, [
+      { text: 'Hayır', style: 'cancel' },
+      { text: 'Evet, teslim aldım', onPress: () => rpc('mark_order_delivered', { p_order_id: o.id }).then(load).catch(showError) },
+    ]);
 
-  const totalPrice = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  const cardW = (width - 16 * 2 - 12) / 2;
+  const refresh = <RefreshControl tintColor="#FF6B00" refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#121212]" edges={['top']}>
-      {/* Header */}
-      <View className="px-6 py-4 flex-row justify-between items-center">
-        <Text className="text-white text-2xl font-black tracking-wide">Sepetim</Text>
-        <TouchableOpacity className="w-10 h-10 bg-[#1E1E1E] rounded-full items-center justify-center border border-zinc-800">
-          <Ionicons name="trash-outline" size={20} color="#ef4444" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView className="flex-1 bg-[#0E0E0E]" edges={['top']}>
+      <Text className="text-white text-3xl font-black px-4 pt-2 pb-4">Aktivite</Text>
+      <Tabs tabs={[{ key: 'orders', label: 'Siparişlerim' }, { key: 'bids', label: 'Tekliflerim' }, { key: 'favorites', label: 'Favorilerim' }]} value={tab} onChange={setTab} />
 
-      {/* Custom Tabs */}
-      <View className="flex-row px-6 mb-4 mt-2">
-        <TouchableOpacity 
-          onPress={() => setActiveTab('cart')}
-          className={`flex-1 pb-3 items-center border-b-2 ${activeTab === 'cart' ? 'border-[#FF6B00]' : 'border-zinc-800'}`}
-        >
-          <Text className={`font-bold ${activeTab === 'cart' ? 'text-[#FF6B00]' : 'text-zinc-500'}`}>
-            Sepetteki Ürünler ({cartItems.length})
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          onPress={() => setActiveTab('favorites')}
-          className={`flex-1 pb-3 items-center border-b-2 ${activeTab === 'favorites' ? 'border-[#FF6B00]' : 'border-zinc-800'}`}
-        >
-          <Text className={`font-bold ${activeTab === 'favorites' ? 'text-[#FF6B00]' : 'text-zinc-500'}`}>
-            Favorilerim
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: activeTab === 'cart' ? 120 : 40 }}>
-        
-        {/* CART TAB */}
-        {activeTab === 'cart' && (
-          <View className="px-4">
-            {cartItems.length === 0 ? (
-              <View className="items-center justify-center mt-20">
-                <Ionicons name="cart-outline" size={64} color="#3f3f46" />
-                <Text className="text-zinc-400 mt-4 text-lg font-medium">Sepetiniz şu an boş.</Text>
-              </View>
-            ) : (
-              cartItems.map((item) => (
-                <View key={item.id} className="bg-[#1E1E1E] p-3 rounded-3xl mb-4 border border-zinc-800 flex-row">
-                  <Image source={{ uri: item.image }} className="w-24 h-24 rounded-2xl bg-zinc-800" />
-                  <View className="flex-1 ml-4 justify-between py-1">
+      {tab === 'orders' && (
+        <FlatList
+          data={orders}
+          keyExtractor={(o) => o.id}
+          refreshControl={refresh}
+          contentContainerStyle={{ padding: 16 }}
+          ListEmptyComponent={<EmptyState icon="bag-outline" title="Henüz siparişin yok" subtitle="Canlı mezatlarda kazandığın ve satın aldığın ürünler burada görünür." action={<Button title="Yayınları keşfet" onPress={() => navigation.navigate('Home')} />} />}
+          renderItem={({ item }) => {
+            const st = ORDER_STATUS_LABEL[item.status];
+            return (
+              <View className="bg-[#1A1A1A] rounded-2xl p-3 mb-3">
+                <View className="flex-row">
+                  <View className="w-20 h-20 rounded-xl bg-[#262626] overflow-hidden mr-3">
+                    {item.product_image ? <Image source={{ uri: item.product_image }} style={{ width: '100%', height: '100%' }} /> : null}
+                  </View>
+                  <View className="flex-1">
                     <View className="flex-row justify-between items-start">
-                      <View className="flex-1 pr-2">
-                        <Text className="text-white font-bold text-base leading-5" numberOfLines={2}>{item.title}</Text>
-                        <Text className="text-zinc-400 text-xs mt-1">{item.seller}</Text>
-                      </View>
-                      <TouchableOpacity onPress={() => removeCartItem(item.id)}>
-                        <Ionicons name="close-circle" size={24} color="#52525b" />
-                      </TouchableOpacity>
+                      <Badge label={st.label} color={st.color} />
+                      <Text className="text-zinc-500 text-xs">{timeAgo(item.created_at)}</Text>
                     </View>
-                    
-                    <View className="flex-row justify-between items-end mt-2">
-                      <Text className="text-[#FF6B00] font-black text-lg">{item.price.toLocaleString('tr-TR')} ₺</Text>
-                      
-                      {/* Quantity Controls */}
-                      <View className="flex-row items-center bg-black/40 rounded-full p-1 border border-zinc-700">
-                        <TouchableOpacity 
-                          className="w-7 h-7 bg-zinc-800 rounded-full items-center justify-center"
-                          onPress={() => updateQty(item.id, -1)}
-                        >
-                          <Ionicons name="remove" size={16} color="white" />
-                        </TouchableOpacity>
-                        <Text className="text-white font-bold px-3">{item.qty}</Text>
-                        <TouchableOpacity 
-                          className="w-7 h-7 bg-zinc-800 rounded-full items-center justify-center"
-                          onPress={() => updateQty(item.id, 1)}
-                        >
-                          <Ionicons name="add" size={16} color="white" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+                    <Text className="text-white font-bold mt-1.5" numberOfLines={1}>{item.product_title}</Text>
+                    <Text className="text-[#FF6B00] font-black text-lg">{formatTL(item.amount)}</Text>
+                    <Text className="text-zinc-500 text-xs">@{item.seller?.username} · {item.source === 'auction' ? 'Mezatta kazandın' : 'Hemen al'}</Text>
                   </View>
                 </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* FAVORITES TAB */}
-        {activeTab === 'favorites' && (
-          <View className="px-4">
-            {favorites.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                className="bg-[#1E1E1E] rounded-3xl mb-4 overflow-hidden border border-zinc-800 flex-row h-32"
-              >
-                <View className="w-32 h-full relative">
-                  <Image source={{ uri: item.image }} className="w-full h-full" resizeMode="cover" />
-                  <View className="absolute inset-0 bg-black/20" />
-                  <View className="absolute top-2 left-2">
-                    {item.isLive ? (
-                      <View className="bg-red-600 px-2 py-1 rounded-md flex-row items-center">
-                        <View className="w-1.5 h-1.5 bg-white rounded-full animate-pulse mr-1" />
-                        <Text className="text-white text-[10px] font-black tracking-wider">CANLI</Text>
-                      </View>
-                    ) : (
-                      <View className="bg-black/80 backdrop-blur-sm px-2 py-1 rounded-md border border-white/20">
-                        <Text className="text-white text-[10px] font-bold">{item.time}</Text>
-                      </View>
-                    )}
+                {item.status === 'awaiting_payment' && (
+                  <Text className="text-amber-400/90 text-xs mt-3">Ödeme altyapısı çok yakında aktif olacak. Satıcı siparişini hazırlıyor.</Text>
+                )}
+                {item.tracking_number ? (
+                  <View className="bg-[#111] rounded-xl p-3 mt-3">
+                    <Text className="text-zinc-300 text-xs">{item.carrier} · Takip no: <Text className="font-bold text-white">{item.tracking_number}</Text></Text>
                   </View>
+                ) : null}
+                {item.status === 'shipped' && <Button small title="Teslim aldım" className="mt-3" onPress={() => confirmDelivered(item)} />}
+              </View>
+            );
+          }}
+        />
+      )}
+
+      {tab === 'bids' && (
+        <FlatList
+          data={bids}
+          keyExtractor={(b) => b.auction_id}
+          refreshControl={refresh}
+          contentContainerStyle={{ padding: 16 }}
+          ListEmptyComponent={<EmptyState icon="hammer-outline" title="Henüz teklif vermedin" subtitle="Canlı yayınlarda mezatlara katıl, teklif geçmişin burada görünür." />}
+          renderItem={({ item }) => {
+            const running = item.status === 'running';
+            const label = running ? (item.winning ? 'Kazanıyorsun' : 'Geçildin') : item.winning && item.status === 'ended' ? 'Kazandın' : 'Kaybettin';
+            const color = item.winning ? '#22C55E' : running ? '#F59E0B' : '#6B7280';
+            return (
+              <View className="flex-row bg-[#1A1A1A] rounded-2xl p-3 mb-2">
+                <View className="w-16 h-16 rounded-xl bg-[#262626] overflow-hidden mr-3">
+                  {item.product_image ? <Image source={{ uri: item.product_image }} style={{ width: '100%', height: '100%' }} /> : null}
                 </View>
-
-                <View className="flex-1 p-4 justify-between">
-                  <View>
-                    <Text className="text-white font-bold text-base mb-1" numberOfLines={2}>{item.title}</Text>
-                    <Text className="text-zinc-400 text-xs">{item.seller}</Text>
-                  </View>
-                  
-                  <View className="flex-row justify-between items-end mt-2">
-                    <Text className="text-white font-black text-lg">{item.price}</Text>
-                    <TouchableOpacity className="bg-zinc-800 px-3 py-1.5 rounded-full flex-row items-center">
-                      <Ionicons name="cart-outline" size={14} color="white" />
-                      <Text className="text-white text-xs font-bold ml-1">Sepete Ekle</Text>
-                    </TouchableOpacity>
-                  </View>
+                <View className="flex-1">
+                  <Text className="text-white font-bold" numberOfLines={1}>{item.product_title}</Text>
+                  <Text className="text-zinc-400 text-xs mt-1">Teklifin: {formatTL(item.my_max)} · Son fiyat: {formatTL(item.current_price)}</Text>
+                  <View className="mt-2"><Badge label={label} color={color} /></View>
                 </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+              </View>
+            );
+          }}
+        />
+      )}
 
-      {/* Sticky Checkout Footer (Only visible on Cart Tab) */}
-      {activeTab === 'cart' && cartItems.length > 0 && (
-        <View className="absolute bottom-0 left-0 right-0 bg-[#1E1E1E] border-t border-zinc-800 px-6 py-5 flex-row justify-between items-center shadow-2xl">
-          <View>
-            <Text className="text-zinc-400 text-xs font-medium mb-1">Toplam Tutar</Text>
-            <Text className="text-white font-black text-2xl">{totalPrice.toLocaleString('tr-TR')} ₺</Text>
-          </View>
-          <TouchableOpacity className="bg-[#FF6B00] px-8 py-4 rounded-2xl shadow-lg shadow-orange-500/30">
-            <Text className="text-white font-black text-lg tracking-wide">Satın Al</Text>
-          </TouchableOpacity>
-        </View>
+      {tab === 'favorites' && (
+        <FlatList
+          data={favorites}
+          key="fav-grid"
+          numColumns={2}
+          keyExtractor={(p) => p.id}
+          refreshControl={refresh}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
+          contentContainerStyle={{ padding: 16 }}
+          ListEmptyComponent={<EmptyState icon="heart-outline" title="Favori ürünün yok" subtitle="Beğendiğin ürünleri kalp ikonuyla kaydet." />}
+          renderItem={({ item }) => <ProductCard product={item} width={cardW} onPress={() => navigation.navigate('ProductDetail', { productId: item.id })} />}
+        />
       )}
     </SafeAreaView>
   );

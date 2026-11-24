@@ -1,14 +1,19 @@
 {
   "expo": {
-    "name": "CanliSatApp",
+    "name": "CanlıSat",
     "slug": "CanliSatApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.CanliSatApp"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.canlisat.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Canlı yayın yapabilmek için kamera erişimi gerekiyor.",
+        "NSMicrophoneUsageDescription": "Canlı yayında sesinin duyulabilmesi için mikrofon erişimi gerekiyor.",
+        "NSPhotoLibraryUsageDescription": "Ürün ve profil fotoğrafı seçebilmek için galeri erişimi gerekiyor."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +29,8 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.INTERNET"
-      ]
+      ],
+      "package": "com.canlisat.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,14 +45,15 @@
           }
         }
       ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow CanliSatApp to access your camera for live streaming."
-        }
-      ],
       "expo-dev-client",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ürün ve profil fotoğrafı seçebilmek için galeri erişimi gerekiyor.",
+          "cameraPermission": "Ürün fotoğrafı çekebilmek için kamera erişimi gerekiyor."
+        }
+      ]
     ]
   }
 }

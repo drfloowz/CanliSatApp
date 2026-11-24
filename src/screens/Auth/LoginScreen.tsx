@@ -1,112 +1,72 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import { authService } from '../../../src/services/authService';
+import { supabase } from '../../services/supabase';
+import { Button, Field } from '../../components/ui';
+import { errorMessage } from '../../lib/api';
 
 export const LoginScreen = ({ navigation }: any) => {
-  const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [error, setError] = useState('');
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setErrorMsg('Lütfen e-posta ve şifrenizi girin.');
-      return;
-    }
-
+  const login = async () => {
+    if (!email.trim() || !password) return setError('E-posta ve şifre gerekli.');
     setLoading(true);
-    setErrorMsg('');
-
-    try {
-      await authService.login(email, password);
-      // Navigation is handled by auth listener in useAuthStore
-    } catch (error: any) {
-      setErrorMsg(error.message || 'Giriş başarısız oldu. Bilgilerinizi kontrol edin.');
-    } finally {
-      setLoading(false);
-    }
+    setError('');
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    setLoading(false);
+    if (error) setError(errorMessage(error));
   };
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'tr' : 'en';
-    i18n.changeLanguage(newLang);
+  const forgot = async () => {
+    if (!email.trim()) return Alert.alert('Şifre sıfırlama', 'Önce e-posta adresinizi yazın.');
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+    Alert.alert('Şifre sıfırlama', error ? errorMessage(error) : 'Sıfırlama bağlantısı e-postanıza gönderildi.');
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#121212]" edges={['top', 'bottom']}>
-      <TouchableOpacity 
-        onPress={toggleLanguage}
-        className="absolute top-12 right-6 bg-[#1E1E1E] px-4 py-2 rounded-full border border-zinc-700 flex-row items-center gap-1 z-10"
-      >
-        <Ionicons name="language" size={16} color="#FF6B00" />
-        <Text className="text-zinc-300 font-semibold text-xs">{t('common.switchLanguage')}</Text>
-      </TouchableOpacity>
+    <SafeAreaView className="flex-1 bg-[#0E0E0E]">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }} keyboardShouldPersistTaps="handled">
+          <View className="items-center mb-10">
+            <View className="w-20 h-20 rounded-3xl bg-[#1A1A1A] items-center justify-center mb-5">
+              <Ionicons name="hammer" size={36} color="#FF6B00" />
+            </View>
+            <Text className="text-white text-4xl font-black italic">
+              Canlı<Text className="text-[#FF6B00]">Sat</Text>
+            </Text>
+            <Text className="text-zinc-400 mt-2">Canlı mezatlara anında katıl</Text>
+          </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1 justify-center px-6"
-      >
-        <View className="items-center mb-10">
-          <Text className="text-4xl font-extrabold text-white tracking-tight mb-2">{t('login.title')}</Text>
-          <Text className="text-zinc-400 text-base">{t('login.subtitle')}</Text>
-        </View>
-
-        <View className="gap-6">
-          {errorMsg ? (
-            <View className="bg-red-500/20 p-4 rounded-2xl border border-red-500/50">
-              <Text className="text-red-400 text-sm font-semibold text-center">{errorMsg}</Text>
+          {error ? (
+            <View className="bg-red-500/15 border border-red-500/40 rounded-2xl p-3 mb-4">
+              <Text className="text-red-400 text-center font-semibold">{error}</Text>
             </View>
           ) : null}
 
+          <Field label="E-posta" placeholder="ornek@email.com" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
           <View>
-            <Text className="text-zinc-300 font-bold mb-2 ml-1">{t('login.emailLabel')}</Text>
-            <TextInput 
-              className="w-full bg-[#1E1E1E] text-white px-5 py-4 rounded-2xl border border-transparent focus:border-[#FF6B00] transition-colors font-medium"
-              placeholder={t('login.emailPlaceholder')}
-              placeholderTextColor="#71717a"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
+            <Field label="Şifre" placeholder="••••••••" secureTextEntry={!showPw} value={password} onChangeText={setPassword} onSubmitEditing={login} />
+            <TouchableOpacity onPress={() => setShowPw(!showPw)} className="absolute right-4 top-[38px]">
+              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+            </TouchableOpacity>
           </View>
+          <TouchableOpacity onPress={forgot} className="self-end mb-6">
+            <Text className="text-zinc-400 font-semibold">Şifremi unuttum</Text>
+          </TouchableOpacity>
 
-          <View>
-            <Text className="text-zinc-300 font-bold mb-2 ml-1">{t('login.passwordLabel')}</Text>
-            <TextInput 
-              className="w-full bg-[#1E1E1E] text-white px-5 py-4 rounded-2xl border border-transparent focus:border-[#FF6B00] transition-colors font-medium"
-              placeholder={t('login.passwordPlaceholder')}
-              placeholderTextColor="#71717a"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
+          <Button title="Giriş Yap" onPress={login} loading={loading} />
 
-          <TouchableOpacity 
-            onPress={handleLogin}
-            disabled={loading}
-            className={`w-full ${loading ? 'opacity-70' : 'opacity-100'} bg-[#FF6B00] mt-4 py-4 rounded-2xl items-center shadow-lg shadow-orange-500/30 active:opacity-80 flex-row justify-center`}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" className="mr-2" />
-            ) : null}
-            <Text className="text-white font-black text-lg tracking-wide">
-              {loading ? 'Yükleniyor...' : t('login.button')}
+          <TouchableOpacity onPress={() => navigation.navigate('Register')} className="mt-8 items-center">
+            <Text className="text-zinc-400">
+              Hesabın yok mu? <Text className="text-[#FF6B00] font-bold">Kayıt ol</Text>
             </Text>
           </TouchableOpacity>
-        </View>
-
-        <View className="flex-row justify-center mt-10">
-          <Text className="text-zinc-400 text-sm font-medium">{t('login.noAccount')}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={loading}>
-            <Text className="text-[#FF6B00] font-bold text-sm ml-1">{t('login.registerLink')}</Text>
-          </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
