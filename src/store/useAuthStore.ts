@@ -45,7 +45,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const uid = get().user?.id;
     if (!uid) return;
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
-    if (data) set({ profile: data as Profile });
+    if (data) return set({ profile: data as Profile });
+    // Eski hesaplarda profil kaydı eksik olabilir: sunucuda oluştur
+    const { data: created } = await supabase.rpc('ensure_profile');
+    if (created) set({ profile: created as Profile });
   },
 
   logout: async () => {
