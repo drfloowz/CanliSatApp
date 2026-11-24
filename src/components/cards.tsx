@@ -27,8 +27,11 @@ export const StreamCard = ({
         {stream.cover_url ? (
           <Image source={{ uri: stream.cover_url }} style={{ width: '100%', height: '100%' }} />
         ) : (
-          <LinearGradient colors={['#2A1607', '#0E0E0E']} style={{ flex: 1 }} className="items-center justify-center">
-            <Ionicons name="videocam" size={36} color="#FF6B00" />
+          // NativeWind className'i LinearGradient'e uygulanmıyor; hizalama style ile verilmeli
+          <LinearGradient colors={['#2A1607', '#0E0E0E']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <View className="w-16 h-16 rounded-full bg-[#FF6B00]/15 items-center justify-center mb-10">
+              <Ionicons name="videocam" size={30} color="#FF6B00" />
+            </View>
           </LinearGradient>
         )}
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' }} />
