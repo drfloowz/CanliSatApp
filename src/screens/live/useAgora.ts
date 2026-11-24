@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
 import {
+  AudioAinsMode,
+  AudioScenarioType,
   ChannelProfileType,
   ClientRoleType,
   createAgoraRtcEngine,
@@ -76,7 +78,14 @@ export const useAgora = (streamId: string | undefined, isHost: boolean, enabled:
           onError: (err, msg) => console.warn('Agora hata', err, msg),
         });
         e.enableVideo();
-        if (isHost) e.startPreview();
+        if (isHost) {
+          // Konuşma odaklı ses: iOS bu modda "ses işleme" (voice processing) kullandığı için
+          // Denetim Merkezi'ndeki Mikrofon Modu (Standart / Ses İzolasyonu / Geniş Spektrum) aktif olur.
+          e.setAudioScenario(AudioScenarioType.AudioScenarioChatroom);
+          // Agora'nın yapay zekâ destekli gürültü engellemesi (Ses İzolasyonu açılmasa da arka plan gürültüsünü azaltır)
+          e.setAINSMode(true, AudioAinsMode.AinsModeBalanced);
+          e.startPreview();
+        }
         setState((s) => ({ ...s, ready: true }));
         e.joinChannel(data.token ?? '', data.channel, 0, {
           clientRoleType: isHost ? ClientRoleType.ClientRoleBroadcaster : ClientRoleType.ClientRoleAudience,
