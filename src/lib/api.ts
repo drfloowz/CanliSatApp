@@ -43,13 +43,32 @@ export async function pickAndUploadImage(userId: string, folder: string, aspect?
   return uploadBase64(userId, folder, result.assets[0].base64, result.assets[0].mimeType);
 }
 
-export async function uploadBase64(userId: string, folder: string, base64: string, mimeType?: string | null) {
-  const contentType = mimeType || 'image/jpeg';
-  const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
-  const path = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from('media').upload(path, decode(base64), { contentType, upsert: false });
-  if (error) throw error;
-  return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
+const UPLOAD_TIMEOUT_MS = 20000;
+
+export async function uploadBase64(userId: string, folder: string, base64: string, _mimeType?: string | null) {
+  // expo-image-picker base64 verisini her zaman JPEG olarak döner (HEIC seçilse bile)
+  const contentType = 'image/jpeg';
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const dir = `${userId}/${folder}`;
+  const path = `${dir}/${name}`;
+  const publicUrl = () => supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
+
+  const upload = supabase.storage
+    .from('media')
+    .upload(path, decode(base64), { contentType, upsert: false })
+    .then(({ error }) => {
+      if (error) throw error;
+      return 'ok' as const;
+    });
+  const timeout = new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), UPLOAD_TIMEOUT_MS));
+
+  const result = await Promise.race([upload, timeout]);
+  if (result === 'ok') return publicUrl();
+
+  // Cevap gelmedi: dosya sunucuya ulaştıysa yine de kullan, ulaşmadıysa kullanıcıya hata göster
+  const { data } = await supabase.storage.from('media').list(dir, { search: name, limit: 1 });
+  if (data?.some((f) => f.name === name)) return publicUrl();
+  throw new Error('Fotoğraf yüklenemedi (zaman aşımı). İnternet bağlantını kontrol edip tekrar dene.');
 }
 
 export const STREAM_SELECT = '*, host:profiles!live_streams_host_id_fkey(id, username, avatar_url, full_name)';
